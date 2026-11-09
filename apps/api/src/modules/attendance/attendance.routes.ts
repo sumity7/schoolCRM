@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { dayStringSchema, objectIdSchema, paginationQuerySchema } from '@edunex/shared';
 import type { Registrar } from '../../core/http/route';
+import { sendCsv } from '../../core/csv/csv';
+import { AuditService } from '../../core/audit/audit.service';
 import { AttendanceService } from './attendance.service';
 
 const status = z.enum(['present', 'absent', 'late', 'half_day', 'excused']);
@@ -76,6 +78,30 @@ export function registerAttendanceRoutes(r: Registrar) {
     query: z.object({ sectionId: objectIdSchema.optional() }).strict(),
     async handler({ query, scope }) {
       return { data: await AttendanceService.lowAttendance(scope, query.sectionId) };
+    },
+  });
+
+  r.define({
+    method: 'get', path: '/attendance/reports/monthly.csv', summary: 'Monthly attendance report (CSV)', tenancy: 'school', auth: 'session', permission: 'attendance:export',
+    rateClass: 'export',
+    query: z.object({ sectionId: objectIdSchema, month: z.string().regex(/^\d{4}-\d{2}$/) }).strict(),
+    async handler({ query, scope, res }) {
+      const rep = await AttendanceService.monthlyReport(scope, query.sectionId, query.month);
+      await AuditService.record({ action: 'attendance.report_exported', entityType: 'section', entityId: query.sectionId, meta: { report: 'monthly', month: query.month, rows: rep.rows.length } });
+      sendCsv(res, `attendance-${query.month}.csv`, ['Roll No', 'Name', 'Marked Days', 'Present', 'Absent', 'Late', 'Half Day', 'Excused', 'Attendance %'],
+        rep.rows.map((r) => [r.rollNo ?? '', r.name, r.markedDays, r.present, r.absent, r.late, r.halfDay, r.excused, r.percentage ?? '']));
+    },
+  });
+
+  r.define({
+    method: 'get', path: '/attendance/reports/low-attendance.csv', summary: 'Low-attendance list (CSV)', tenancy: 'school', auth: 'session', permission: 'attendance:export',
+    rateClass: 'export',
+    query: z.object({ sectionId: objectIdSchema.optional() }).strict(),
+    async handler({ query, scope, res }) {
+      const rep = await AttendanceService.lowAttendance(scope, query.sectionId);
+      await AuditService.record({ action: 'attendance.report_exported', entityType: 'section', entityId: query.sectionId, meta: { report: 'low-attendance', rows: rep.rows.length } });
+      sendCsv(res, 'low-attendance.csv', ['Name', 'Marked Days', 'Present', 'Absent', 'Late', 'Half Day', 'Excused', 'Attendance %', 'Threshold %'],
+        rep.rows.map((r) => [r.name, r.markedDays, r.present, r.absent, r.late, r.halfDay, r.excused, r.percentage ?? '', rep.threshold]));
     },
   });
 }

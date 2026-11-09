@@ -17,6 +17,7 @@ import { registerAcademicsRoutes } from './modules/academics/academics.routes';
 import { registerStaffRoutes } from './modules/staff/staff.routes';
 import { registerStudentRoutes } from './modules/students/students.routes';
 import { registerAttendanceRoutes } from './modules/attendance/attendance.routes';
+import { registerImportRoutes } from './modules/imports/imports.routes';
 
 export interface AppDeps {
   env: Env;
@@ -56,6 +57,8 @@ export function createApp(deps: AppDeps): BuiltApp {
   app.get('/health/live', (_req, res) => res.json({ status: 'ok' }));
   app.get('/health/ready', (_req, res) => (dbReady() ? res.json({ status: 'ready' }) : res.status(503).json({ status: 'not_ready' })));
 
+  // CSV uploads (≤ 2,000 rows) are the only large bodies; every other route keeps the 100 kb cap.
+  app.use(`${API_BASE}/imports`, express.json({ limit: '4mb', strict: true, type: 'application/json' }));
   app.use(express.json({ limit: '100kb', strict: true, type: 'application/json' }));
   app.use(rejectOperatorKeys);
 
@@ -79,6 +82,7 @@ export function createApp(deps: AppDeps): BuiltApp {
   registerStaffRoutes(registrar);
   registerStudentRoutes(registrar);
   registerAttendanceRoutes(registrar);
+  registerImportRoutes(registrar);
 
   app.use(API_BASE, router);
   app.use(notFoundHandler());

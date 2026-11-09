@@ -81,6 +81,8 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
     'get /attendance/students/:studentId': { query: `?from=${todayIst()}&to=${todayIst()}` },
     'post /attendance/corrections/:id/approve': { body: {} }, 'post /attendance/corrections/:id/reject': { body: {} },
     'patch /users/:membershipId': { body: { status: 'suspended' } },
+    'get /imports/:id': {}, 'put /imports/:id/mapping': { body: { mapping: { admissionNo: 0 } } }, 'post /imports/:id/validate': { body: {} },
+    'post /imports/:id/commit': { body: {} }, 'post /imports/:id/rollback': { body: {} }, 'get /imports/:id/errors.csv': {},
   });
 
   const snapshotSchool = async (schoolId: Types.ObjectId) => {
@@ -97,7 +99,10 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
     const HB = await buildSchoolData(app, 'harnb');
     const bCorrection = await runAsPlatform('test: B correction', async () =>
       AttendanceCorrectionModel.create({ schoolId: HB.school.schoolId, studentId: new Types.ObjectId(HB.studentsA[0]), sectionId: new Types.ObjectId(HB.sectionA), date: '2026-01-05', to: 'present', reason: 'fixture', requestedBy: new Types.ObjectId(), status: 'pending' }));
+    const bImport = await HB.owner.post('/imports', { entity: 'students', filename: 'b.csv', csv: 'Admission No,Student Name,DOB\nB-9,Secret Kid,01/01/2015' });
+    if (bImport.status !== 201) throw new Error(`fixture import: ${bImport.status}`);
     const fx: Record<string, string> = {
+      import: bImport.body.data.id,
       session: HB.sessionId, class: HB.classId, section: HB.sectionA, subject: HB.subjectId, assignment: HB.assignmentId, event: HB.eventId,
       staff: HB.teacherStaffId, student: HB.studentsA[0]!, guardian_link: HB.guardianLinkId, correction: String(bCorrection._id), membership: String(HB.teacherMembershipId),
     };
@@ -126,17 +131,18 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
   });
 
   it("every collection route returns only the caller's own rows (no School B id appears anywhere)", async () => {
-    const { HA, HB } = await twoSchools();
-    const bIds = [HB.sessionId, HB.classId, HB.sectionA, HB.sectionB, HB.subjectId, HB.teacherStaffId, HB.assignmentId, HB.eventId, HB.guardianLinkId, ...HB.studentsA, ...HB.studentsB, String(HB.school.schoolId), String(HB.teacherMembershipId)];
+    const { HA, HB, fx } = await twoSchools();
+    const bIds = ['Secret Kid', fx.import!, HB.sessionId, HB.classId, HB.sectionA, HB.sectionB, HB.subjectId, HB.teacherStaffId, HB.assignmentId, HB.eventId, HB.guardianLinkId, ...HB.studentsA, ...HB.studentsB, String(HB.school.schoolId), String(HB.teacherMembershipId)];
     const routes = registrar.manifest.filter((m) => m.method === 'get' && m.tenancy === 'school' && !m.path.includes(':'));
-    const queries: Record<string, string> = { '/attendance/reports/monthly': `?sectionId=${HA.sectionA}&month=${todayIst().slice(0, 7)}` };
+    const month = `?sectionId=${HA.sectionA}&month=${todayIst().slice(0, 7)}`;
+    const queries: Record<string, string> = { '/attendance/reports/monthly': month, '/attendance/reports/monthly.csv': month };
     let checked = 0;
     for (const m of routes) {
       const p = m.path.replace('/api/v1', '');
-      const res = await HA.owner.get(`${p}${queries[p] ?? ''}`);
+      const res = (await HA.owner.get(`${p}${queries[p] ?? ''}`)) as { status: number; body: unknown; text?: string };
       if (res.status === 400) continue; // route needs params we did not supply (covered by the id-route attack)
       expect(res.status, p).toBe(200);
-      const text = JSON.stringify(res.body);
+      const text = JSON.stringify(res.body) + (res.text ?? '');
       for (const id of bIds) expect(text.includes(id), `${p} leaked School B id ${id}`).toBe(false);
       checked++;
     }

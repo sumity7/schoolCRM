@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { dayStringSchema, objectIdSchema, paginationQuerySchema } from '@edunex/shared';
 import type { Registrar } from '../../core/http/route';
+import { sendCsv } from '../../core/csv/csv';
+import { AuditService } from '../../core/audit/audit.service';
 import { StudentsService, toStudentDto } from './students.service';
 
 const idParam = z.object({ id: objectIdSchema }).strict();
@@ -38,6 +40,17 @@ export function registerStudentRoutes(r: Registrar) {
     async handler({ body }) {
       const res = await StudentsService.create(body);
       return { status: 201, data: toStudentDto(res.student, res.enrollment) };
+    },
+  });
+
+  r.define({
+    method: 'get', path: '/students/export.csv', summary: 'Export students (CSV, re-importable; formula-injection safe)', tenancy: 'school', auth: 'session', permission: 'students:export',
+    rateClass: 'export',
+    query: z.object({ status: z.enum(['active', 'transferred', 'withdrawn', 'graduated', 'alumni']).optional(), sectionId: objectIdSchema.optional(), classId: objectIdSchema.optional() }).strict(),
+    async handler({ query, scope, res }) {
+      const out = await StudentsService.exportRows(scope, query);
+      await AuditService.record({ action: 'students.exported', entityType: 'student', meta: { rows: out.rows.length, filters: query } });
+      sendCsv(res, `students-${new Date().toISOString().slice(0, 10)}.csv`, out.headers, out.rows);
     },
   });
 

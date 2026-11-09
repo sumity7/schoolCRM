@@ -10,7 +10,7 @@ npx vitest run
 Tests use one in-memory MongoDB **replica set** (real transactions) with one database per test file. Synthetic data only.
 Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8.3.4 (local), Vitest 3.2.7.
 
-## Latest run — checkpoint 2 (2026-11-09, session 1)
+## Latest run — checkpoint 4 (2026-11-09, session 2)
 
 | Suite | File | Tests | Result |
 |---|---|---|---|
@@ -18,10 +18,11 @@ Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8
 | Kernel: sequences, idempotency, audit redaction, rate limit, env validation | `src/core/kernel.test.ts` | 12 | **12 passed** |
 | Shared package: identifiers, calendar days, permission catalogue/roles | `src/shared.test.ts` | 8 | **8 passed** |
 | Auth, sessions, CSRF, reset/invite, tenant switching, hygiene | `test/auth.test.ts` | 29 | **29 passed** |
-| Route manifest, isolation harness v2 (all id-routes attacked with School B ids + byte-for-byte snapshot; collection-route leak sweep), RBAC/escalation, audit | `test/rbac-isolation.test.ts` | 18 | **18 passed** |
+| Route manifest, isolation harness v2 (all id-routes — now incl. the 6 import routes — attacked with School B ids + byte-for-byte snapshot; collection-route leak sweep incl. CSV bodies), RBAC/escalation, audit | `test/rbac-isolation.test.ts` | 18 | **18 passed** |
 | R1 domain: academics, students, guardians, attendance (scope, dates, corrections, percentages, concurrency) | `test/r1-domain.test.ts` | 25 | **25 passed** |
 | Lint canaries (the architecture rules actually fire) | `test/lint-rules.test.ts` | 4 | **4 passed** |
-| **Total** | 7 files | **118** | **118 passed, 0 failed, 0 skipped** |
+| Import/export: CSV parser + formula-injection sanitiser, date parsing, mapping; 1,000-row/30-bad acceptance, re-import duplicates, class/section/roll/capacity/plan-limit validation, sibling guardian reuse, idempotent commit, rollback of untouched rows only, transaction-join proof, RBAC; student + attendance CSV exports (audited, re-importable) | `test/imports.test.ts` | 17 | **17 passed** |
+| **Total** | 8 files | **135** | **135 passed, 0 failed, 0 skipped** |
 
 Static checks at the same commit: `tsc --noEmit` (strict) clean; `eslint apps packages --max-warnings 0` clean.
 
@@ -55,6 +56,6 @@ Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a re
 
 ## Not yet covered (tracked in PROGRESS.md)
 - E2E on WebKit/Firefox and real devices; E2E against the production-style reverse-proxy topology.
-- Tests for modules not yet built (academics, students, import, attendance, fees, …).
+- Tests for modules not yet built (fees, exams, portals, …). Import UI is not yet E2E-tested.
 - Background job queue tests (R3), PDF Hindi rendering spike (R2).
 - Performance, restore drill, tenant export/purge/restore round-trip (Phase 7).

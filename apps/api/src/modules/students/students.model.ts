@@ -67,6 +67,7 @@ export interface IEnrollment {
   status: 'active' | 'promoted' | 'retained' | 'transferred' | 'withdrawn' | 'graduated';
   joinedOn: string;
   leftOn?: string;
+  importBatchId?: Types.ObjectId | null;
 }
 /** One enrollment per student per session. Promotion closes the old row and creates a new one — history is immutable. */
 export const EnrollmentModel = defineTenantModel<IEnrollment>(
@@ -80,6 +81,7 @@ export const EnrollmentModel = defineTenantModel<IEnrollment>(
     status: { type: String, enum: ['active', 'promoted', 'retained', 'transferred', 'withdrawn', 'graduated'], default: 'active', required: true },
     joinedOn: { type: String, required: true },
     leftOn: { type: String },
+    importBatchId: { type: 'ObjectId', default: null },
   },
   (s) => {
     s.index({ schoolId: 1, studentId: 1, sessionId: 1 }, { unique: true });
@@ -94,6 +96,7 @@ export interface IGuardian {
   email?: string;
   occupation?: string;
   userId?: Types.ObjectId | null;
+  importBatchId?: Types.ObjectId | null;
 }
 /** Guardians exist before (and without) a login. Phones are NOT unique: families share numbers. */
 export const GuardianModel = defineTenantModel<IGuardian>(
@@ -104,6 +107,7 @@ export const GuardianModel = defineTenantModel<IGuardian>(
     email: { type: String, trim: true, lowercase: true, maxlength: 254 },
     occupation: { type: String, maxlength: 80 },
     userId: { type: 'ObjectId', default: null },
+    importBatchId: { type: 'ObjectId', default: null },
   },
   (s) => {
     s.index({ schoolId: 1, phone: 1 });
@@ -123,6 +127,7 @@ export interface IStudentGuardian {
   verifiedAt?: Date | null;
   verifiedBy?: Types.ObjectId | null;
   endedAt?: Date | null;
+  importBatchId?: Types.ObjectId | null;
 }
 /**
  * THE access-control link for parents (R3): a parent may see a child only through an active link that is
@@ -141,6 +146,7 @@ export const StudentGuardianModel = defineTenantModel<IStudentGuardian>(
     verifiedAt: { type: Date, default: null },
     verifiedBy: { type: 'ObjectId', default: null },
     endedAt: { type: Date, default: null },
+    importBatchId: { type: 'ObjectId', default: null },
   },
   (s) => {
     s.index({ schoolId: 1, studentId: 1, guardianId: 1 }, { unique: true });

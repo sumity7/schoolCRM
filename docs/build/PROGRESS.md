@@ -3,7 +3,7 @@
 > **Resume rule:** read this file first. Continue from "NEXT ACTION". Do not re-ask decisions listed in DECISION-LOG.md.
 > Honest status vocabulary: `NOT STARTED` · `IN PROGRESS` · `CODE WRITTEN (untested)` · `TESTED` (tests actually executed and passing, with counts in TEST-REPORT.md) · `DEFERRED`.
 
-Last updated: 2026-11-09 (session 1, checkpoint 3)
+Last updated: 2026-11-09 (session 2, checkpoint 4)
 
 ## Release map
 
@@ -25,14 +25,14 @@ Last updated: 2026-11-09 (session 1, checkpoint 3)
 | 3g | Playwright E2E: login/session persistence, CSRF second-origin, tenant switching/stale tab | **TESTED** (14/14, desktop + 360 px) |
 | 4 | Academics API: sessions, classes, sections, subjects, teacher assignments, holidays; staff API; CLI provisioning | **TESTED** (API); CLI untested |
 | 5a | Students, enrolments, guardians + verified links, lifecycle (transfer/withdraw/graduate/re-admit), search | **TESTED** (API) |
-| 5b | CSV import (mapping/preview/errors/commit/rollback) + CSV export | NOT STARTED |
+| 5b | CSV import (upload → auto-mapping → validate/preview → error CSV → idempotent commit of valid rows → rollback of untouched rows) + CSV exports (students, monthly + low attendance), formula-injection safe | **TESTED** (API, 135/135); UI NOT STARTED |
 | 6 | Attendance API: sheet, bulk save (all-or-nothing), corrections + approval, history, monthly + low-attendance reports | **TESTED** (API) |
 | 6e | E2E: attendance submission + mobile workflows | **TESTED** (14/14) |
 | 7 | Hardening: backup/restore scripts, tenant export/purge/restore, deployment docs, perf test | NOT STARTED |
 | Web | Next.js: shell + auth pages written (partial, untested); module screens NOT STARTED | IN PROGRESS |
 
 ## NEXT ACTION
-1. R1 remaining: (a) web screens listed under "Web" above (no dead nav links are allowed — add nav items only with their pages); (b) CSV import (mapping/preview/error report/commit/rollback) + CSV export with formula-injection sanitising; (c) tenant export/purge/restore + backup/restore scripts + restore drill; (d) deployment docs (ADR-2 reverse proxy), performance test with realistic dataset, security review pass; (e) `docs/build` remaining files (ARCHITECTURE, SETUP, ENVIRONMENT, DEPLOYMENT, SECURITY-REPORT, MASTER-IMPLEMENTATION-PLAN, traceability matrix).
+1. R1 remaining: (a) web screens listed under "Web" above incl. the import wizard + export buttons (no dead nav links are allowed — add nav items only with their pages); (b) ~~CSV import/export API~~ done at checkpoint 4; (c) tenant export/purge/restore + backup/restore scripts + restore drill; (d) deployment docs (ADR-2 reverse proxy), performance test with realistic dataset, security review pass; (e) `docs/build` remaining files (ARCHITECTURE, SETUP, ENVIRONMENT, DEPLOYMENT, SECURITY-REPORT, MASTER-IMPLEMENTATION-PLAN, traceability matrix).
 2. R2 Fees & ledger (start with the pdfmake Hindi rendering spike, ADR-6). R3 (re-evaluate job queue first, ADR-5), R4, R5.
 3. Never mark a release done without its acceptance tests (docs/phase-0/11).
 

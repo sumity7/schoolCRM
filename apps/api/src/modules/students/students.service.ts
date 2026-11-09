@@ -7,6 +7,8 @@ import { requireTenant } from '../../core/tenancy/context';
 import { toObjectId } from '../../core/tenancy/repository';
 import { AcademicsService } from '../academics/academics.service';
 import { sectionRepo, classRepo } from '../academics/academics.repository';
+
+const EXPORT_MAX = 20000;
 import { getSchoolById } from '../schools/schools.service';
 import { enrollmentRepo, guardianRepo, studentGuardianRepo, studentRepo } from './students.repository';
 import type { IStudent, StudentStatus } from './students.model';
@@ -54,6 +56,14 @@ export const StudentsService = {
   },
 
   async list(scope: Scope | undefined, q: { page: number; limit: number; status?: StudentStatus; sectionId?: string; classId?: string; q?: string }) {
+    const filter = await this.buildFilter(scope, q);
+    const res = await studentRepo.paginate(filter, q.page, q.limit, { normalizedName: 1 });
+    const enrolls = await enrollmentRepo.find({ _id: { $in: res.data.map((s) => s.currentEnrollmentId).filter(Boolean) as Types.ObjectId[] } });
+    const byId = new Map(enrolls.map((e) => [String(e._id), e]));
+    return { meta: res.meta, data: res.data.map((s) => toStudentDto(s, byId.get(String(s.currentEnrollmentId)))) };
+  },
+
+  async buildFilter(scope: Scope | undefined, q: { status?: StudentStatus; sectionId?: string; classId?: string; q?: string }) {
     const visible = await this.visibleStudentIds(scope);
     const filter: Record<string, unknown> = {};
     if (q.status) filter.status = q.status;
@@ -75,10 +85,40 @@ export const StudentsService = {
       const rx = new RegExp(`^${escapeRegex(text.replace(/\s+/g, ' '))}`);
       filter.$or = [{ normalizedName: rx }, { admissionNo: new RegExp(`^${escapeRegex(q.q!.trim())}`, 'i') }, { 'contact.phone': new RegExp(`^${escapeRegex(q.q!.trim())}`) }];
     }
-    const res = await studentRepo.paginate(filter, q.page, q.limit, { normalizedName: 1 });
-    const enrolls = await enrollmentRepo.find({ _id: { $in: res.data.map((s) => s.currentEnrollmentId).filter(Boolean) as Types.ObjectId[] } });
-    const byId = new Map(enrolls.map((e) => [String(e._id), e]));
-    return { meta: res.meta, data: res.data.map((s) => toStudentDto(s, byId.get(String(s.currentEnrollmentId)))) };
+    return filter;
+  },
+
+  /**
+   * Rows for the CSV export. Headers are the IMPORT labels, so an exported file can be re-imported unchanged.
+   * Capped at EXPORT_MAX rows (narrow the filter beyond that); the route audits every export with its row count.
+   */
+  async exportRows(scope: Scope | undefined, q: { status?: StudentStatus; sectionId?: string; classId?: string }) {
+    const filter = await this.buildFilter(scope, q);
+    const students = await studentRepo.find(filter, { sort: { normalizedName: 1 }, limit: EXPORT_MAX + 1 });
+    if (students.length > EXPORT_MAX) throw validationFailed(`More than ${EXPORT_MAX} students match — filter by class or status`);
+    const enrolls = await enrollmentRepo.findByIds(students.map((s) => s.currentEnrollmentId).filter(Boolean));
+    const eBy = new Map(enrolls.map((e) => [String(e._id), e]));
+    const [classes, sections] = await Promise.all([classRepo.findByIds([...new Set(enrolls.map((e) => String(e.classId)))]), sectionRepo.findByIds([...new Set(enrolls.map((e) => String(e.sectionId)))])]);
+    const cBy = new Map(classes.map((c) => [String(c._id), c.name]));
+    const sBy = new Map(sections.map((x) => [String(x._id), x.name]));
+    const links = await studentGuardianRepo.find({ studentId: { $in: students.map((s) => s._id) }, endedAt: null }, { sort: { isPrimary: -1, createdAt: 1 } });
+    const firstLink = new Map<string, (typeof links)[number]>();
+    for (const l of links) if (!firstLink.has(String(l.studentId))) firstLink.set(String(l.studentId), l);
+    const guardians = await guardianRepo.findByIds([...firstLink.values()].map((l) => l.guardianId));
+    const gBy = new Map(guardians.map((g) => [String(g._id), g]));
+    const headers = ['Admission No', 'First Name', 'Last Name', 'Date of Birth', 'Gender', 'Class', 'Section', 'Roll No', 'Admission Date', 'Student Phone', 'Student Email', 'Guardian Name', 'Guardian Relationship', 'Guardian Phone', 'Guardian Email', 'Address', 'City', 'State', 'PIN Code', 'Status'];
+    const rows = students.map((s) => {
+      const e = s.currentEnrollmentId ? eBy.get(String(s.currentEnrollmentId)) : undefined;
+      const active = e && e.status === 'active';
+      const l = firstLink.get(String(s._id));
+      const g = l ? gBy.get(String(l.guardianId)) : undefined;
+      return [
+        s.admissionNo, s.firstName, s.lastName ?? '', s.dob, s.gender ?? '', active ? cBy.get(String(e.classId)) ?? '' : '', active ? sBy.get(String(e.sectionId)) ?? '' : '',
+        active ? e.rollNo ?? '' : '', s.admissionDate, s.contact?.phone ?? '', s.contact?.email ?? '', g?.name ?? '', g ? l!.relationship : '', g?.phone ?? '', g?.email ?? '',
+        s.address?.line1 ?? '', s.address?.city ?? '', s.address?.state ?? '', s.address?.postalCode ?? '', s.status,
+      ];
+    });
+    return { headers, rows };
   },
 
   async getVisible(scope: Scope | undefined, id: string) {
