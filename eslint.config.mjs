@@ -53,6 +53,7 @@ export default tseslint.config(
     files: ['**/*.repository.ts', '**/*.model.ts', '**/*.test.ts', 'apps/api/test/**/*.ts', 'apps/api/scripts/**/*.ts', 'apps/api/src/core/**/*.ts'],
     rules: { '@typescript-eslint/no-restricted-imports': 'off', 'no-restricted-syntax': 'off' },
   },
+  { files: ['**/*.mjs'], languageOptions: { globals: { process: 'readonly', console: 'readonly' } } },
   {
     files: ['apps/api/src/core/tenancy/plugin.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },

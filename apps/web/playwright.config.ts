@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const WEB = 'http://localhost:3100';
+// Optional: drive an installed browser (e.g. PW_CHANNEL=msedge or chrome) instead of downloading Playwright's Chromium.
+const channel = process.env.PW_CHANNEL || undefined;
 
 export default defineConfig({
   testDir: './e2e',
@@ -13,8 +15,8 @@ export default defineConfig({
   reporter: [['list']],
   use: { baseURL: WEB, trace: 'retain-on-failure' },
   projects: [
-    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile-360', use: { ...devices['Pixel 5'], viewport: { width: 360, height: 740 } } },
+    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], channel } },
+    { name: 'mobile-360', use: { ...devices['Pixel 5'], viewport: { width: 360, height: 740 }, channel } },
   ],
   webServer: [
     {

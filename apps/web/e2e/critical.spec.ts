@@ -13,6 +13,14 @@ async function login(page: Page, email: string) {
   await page.getByTestId('identifier').fill(email);
   await page.getByTestId('password').fill(PASSWORD);
   await page.getByTestId('login-submit').click();
+  await page.waitForURL(/\/(app|select-school)/); // the session cookie exists once we have navigated
+}
+
+/** Navigate via the sidebar; on phones the sidebar lives behind the hamburger menu. */
+async function navTo(page: Page, name: string) {
+  const burger = page.getByRole('button', { name: 'Open menu' });
+  if (await burger.isVisible()) await burger.click();
+  await page.getByRole('link', { name, exact: true }).first().click();
 }
 
 test.describe('E2E-01 login & session persistence', () => {
@@ -50,7 +58,7 @@ test.describe('E2E-01 login & session persistence', () => {
     await page.getByTestId('identifier').fill('owner@alpha.test');
     await page.getByTestId('password').fill('definitely-wrong-1');
     await page.getByTestId('login-submit').click();
-    await expect(page.getByRole('alert')).toContainText('Invalid credentials');
+    await expect(page.getByRole('alert').filter({ hasText: 'Invalid credentials' })).toBeVisible();
     await page.goto('/app');
     await expect(page).toHaveURL(/\/login/);
   });
@@ -91,7 +99,7 @@ test.describe('E2E-03 tenant switching & stale-tab protection', () => {
     await expect(page).toHaveURL(/select-school/);
     await page.getByTestId('school-alpha').click();
     await expect(page.getByTestId('school-name')).toHaveText('School alpha');
-    await page.getByRole('link', { name: 'Students' }).first().click();
+    await navTo(page, 'Students');
     await expect(page.getByTestId('students-table')).toContainText('alpha-A1');
     await expect(page.getByTestId('students-table')).not.toContainText('bravo-'); // no Bravo admission number may ever appear
 
@@ -134,7 +142,7 @@ test.describe('E2E-04 attendance submission', () => {
       } else await route.continue();
     });
     await page.getByTestId('save-attendance').click();
-    await expect(page.getByRole('alert')).toContainText(/Cannot reach the server/i);
+    await expect(page.getByRole('alert').filter({ hasText: /Cannot reach the server/i })).toBeVisible();
     await page.getByTestId('save-attendance').dblclick(); // double-click must not create duplicates
     await expect(page.getByTestId('saved-msg')).toContainText('Saved 3 students');
 

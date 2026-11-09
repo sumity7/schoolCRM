@@ -25,7 +25,9 @@ uri.pathname = '/edunex_e2e';
 
 const env = loadEnv({
   NODE_ENV: 'test', PORT: process.env.E2E_API_PORT ?? '4100', DATABASE_URL: uri.toString(),
-  ALLOWED_ORIGINS: process.env.E2E_WEB_ORIGIN ?? 'http://localhost:3100', RATE_LIMIT_ENABLED: 'false', LOG_LEVEL: 'warn',
+  // :3000 is the Origin the seeding helpers send; the attacker origin :3200 is deliberately NOT allowed.
+  ALLOWED_ORIGINS: `${process.env.E2E_WEB_ORIGIN ?? 'http://localhost:3100'},http://localhost:3000`,
+  RATE_LIMIT_ENABLED: 'false', LOG_LEVEL: 'warn',
 } as NodeJS.ProcessEnv);
 await connectDb(env.DATABASE_URL);
 await ensureIndexes();

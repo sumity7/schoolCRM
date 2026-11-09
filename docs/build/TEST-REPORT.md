@@ -25,17 +25,36 @@ Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8
 
 Static checks at the same commit: `tsc --noEmit` (strict) clean; `eslint apps packages --max-warnings 0` clean.
 
+## Browser E2E (Playwright) — checkpoint 2
+
+Run: `cd apps/web && $env:MONGOMS_SYSTEM_BINARY="<mongod path>"; $env:PW_CHANNEL="msedge"; npx playwright test`
+(`PW_CHANNEL` drives an installed browser; without it Playwright's own Chromium must be installed.) The run starts an isolated in-memory
+MongoDB replica set + the real API (`apps/api/scripts/e2e-server.ts`, synthetic seed), the Next.js dev server, and a second-origin
+"attacker" page (`apps/web/e2e/attacker-server.mjs`).
+
+| ID | Flow (docs/phase-0/11 §2.1) | desktop Edge/Chromium | mobile 360 px |
+|---|---|---|---|
+| E2E-01 | Login, reload, new tab, HttpOnly + SameSite=Lax cookie, not readable by page JS, logout invalidates other tab and back button; wrong password generic error | pass | pass |
+| E2E-02 | CSRF: fetch + form forgeries from a second origin with the victim's cookies; foreign `Origin` and missing custom header → 403 `CSRF_REJECTED`; victim still logged in | pass | pass |
+| E2E-03 | Tenant switching: data switches school; stale tab gets 409 and reloads into the new school; no cross-school admission numbers visible | pass | pass |
+| E2E-04 | Attendance: teacher sees only the assigned section; mark, simulated network drop → clear error → retry/double-click saves once; reload shows saved values; other section refused (403) | pass | pass |
+| E2E-05 | Mobile: no horizontal scroll, tap targets ≥ 36 px (controls are 44 px), hamburger menu, login → attendance → submit | pass | pass |
+| **Total** | 7 specs × 2 projects | **14 passed, 0 failed** | |
+
+Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a real phone have not been run; the Next.js *development* server was used (production-topology proxy of ADR-2 not yet exercised); E2E covers the screens that exist (auth, shell, dashboard, students list, attendance).
+
 ## Defects found by the tests and fixed (not hidden)
 1. `PlatformRepository.updateOne/updateMany/count/deleteMany/aggregate` returned lazy Mongoose queries that executed **after** the `runAsPlatform` scope ended → the tenancy plugin correctly failed closed ("Tenant context missing"). Fixed by awaiting inside the scope. (Demonstrates lock 3 fail-closed behaviour.)
 2. Argon2 test parameters violated the library minimum (`timeCost ≥ 2`) → fixed.
-3. Two tenancy tests had incorrect assumptions (lazy query escaping scope; synchronous throw) → tests corrected and a new test added that asserts an escaped lazy query fails closed.
+3. (E2E) The seeding helper's origin was missing from the E2E server's allow-list (the CSRF guard correctly refused it); an edit accidentally disabled the E2E server's rate-limit flag; Next's route announcer shares `role=alert` with our alerts; the E2E `login()` helper did not wait for navigation — all test-harness defects, fixed.
+3b. Two tenancy tests had incorrect assumptions (lazy query escaping scope; synchronous throw) → tests corrected and a new test added that asserts an escaped lazy query fails closed.
 4. A test named "last owner cannot be demoted" did not exercise that rule → replaced by precise tests (only an Owner may demote/suspend an Owner; self-modification forbidden).
 
 5. Re-admitting a withdrawn student into another section kept the old roll number (Mongoose drops `undefined` from `$set`) and hit the roll-number unique index → fixed with explicit nulls; covered by the lifecycle test.
 6. The isolation harness initially failed on purpose for routes/resource kinds without a School B fixture (coverage gate) → fixtures and attack specs added for every id-bearing route.
 
 ## Not yet covered (tracked in PROGRESS.md)
-- Browser E2E (Playwright): login/session persistence, CSRF from a second origin, tenant switching/stale tab, attendance submission, mobile workflows — **not yet written/executed** (web app in progress).
+- E2E on WebKit/Firefox and real devices; E2E against the production-style reverse-proxy topology.
 - Tests for modules not yet built (academics, students, import, attendance, fees, …).
 - Background job queue tests (R3), PDF Hindi rendering spike (R2).
 - Performance, restore drill, tenant export/purge/restore round-trip (Phase 7).
