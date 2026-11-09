@@ -66,3 +66,57 @@ export function Alert({ tone = 'danger', children }: { tone?: 'danger' | 'succes
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn('animate-pulse rounded-md bg-muted', className)} aria-hidden />;
 }
+
+export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, ...props }, ref) {
+  return <select ref={ref} className={cn('min-h-11 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground', className)} {...props} />;
+});
+
+export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...props }, ref) {
+  return <textarea ref={ref} className={cn('min-h-20 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground', className)} {...props} />;
+});
+
+export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="break-words text-xl font-semibold">{title}</h1>
+        {description ? <p className="mt-0.5 text-sm text-muted-foreground">{description}</p> : null}
+      </div>
+      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+    </div>
+  );
+}
+
+export function Badge({ tone = 'muted', children }: { tone?: 'muted' | 'success' | 'warning' | 'danger' | 'primary'; children: React.ReactNode }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+        tone === 'muted' && 'bg-muted text-muted-foreground',
+        tone === 'success' && 'bg-success/15 text-success',
+        tone === 'warning' && 'bg-warning/15 text-warning',
+        tone === 'danger' && 'bg-danger/15 text-danger',
+        tone === 'primary' && 'bg-primary/15 text-primary',
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Simple table wrapper: horizontal scroll inside the card, never on the page. */
+export function Table({ children, minWidth = 480, testId }: { children: React.ReactNode; minWidth?: number; testId?: string }) {
+  return (
+    <Card className="overflow-x-auto">
+      <table className="w-full text-sm" style={{ minWidth }} data-testid={testId}>
+        {children}
+      </table>
+    </Card>
+  );
+}
+export function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
+  return <th className={cn('p-3 text-left text-xs font-medium text-muted-foreground', className)}>{children}</th>;
+}
+export function Td({ children, className }: { children?: React.ReactNode; className?: string }) {
+  return <td className={cn('p-3 align-top', className)}>{children}</td>;
+}

@@ -49,7 +49,7 @@ export function registerAttendanceRoutes(r: Registrar) {
     query: paginationQuerySchema.extend({ status: z.enum(['pending', 'approved', 'rejected']).default('pending') }).strict(),
     async handler({ query, scope }) {
       const res = await AttendanceService.listCorrections(scope, query.status, query.page, query.limit);
-      return { data: res.data.map((c) => ({ id: String(c._id), studentId: String(c.studentId), sectionId: String(c.sectionId), date: c.date, from: c.from, to: c.to, reason: c.reason, status: c.status, requestedBy: String(c.requestedBy) })), meta: res.meta };
+      return { data: res.data.map((c) => ({ id: String(c._id), studentId: String(c.studentId), sectionId: String(c.sectionId), date: c.date, from: c.from, to: c.to, reason: c.reason, status: c.status, requestedBy: String(c.requestedBy), studentName: c.studentName, admissionNo: c.admissionNo })), meta: res.meta };
     },
   });
 

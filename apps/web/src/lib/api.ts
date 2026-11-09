@@ -60,3 +60,40 @@ export const post = <T,>(path: string, body: Json = {}, opts?: { idempotencyKey?
 export const patch = <T,>(path: string, body: Json) => api<T>('PATCH', path, body);
 export const del = <T,>(path: string) => api<T>('DELETE', path);
 export const put = <T,>(path: string, body: Json) => api<T>('PUT', path, body);
+
+/** Human-readable message for any thrown value (API errors carry server text; details are appended). */
+export function errorText(e: unknown, fallback = 'Something went wrong'): string {
+  if (e instanceof ApiError) {
+    const extra = e.details?.length ? ` — ${e.details.map((d) => d.message).join('; ')}` : '';
+    return `${e.message}${extra}`;
+  }
+  return fallback;
+}
+
+/** Fetches a file (CSV) with the same headers as API calls and hands it to the browser as a download. */
+export async function downloadFile(path: string, fallbackName = 'download.csv'): Promise<void> {
+  const headers: Record<string, string> = { 'X-Requested-With': 'edunex' };
+  if (activeMembershipId) headers['X-Active-Membership'] = activeMembershipId;
+  let res: Response;
+  try {
+    res = await fetch(`/api/v1${path}`, { headers, credentials: 'same-origin' });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'Cannot reach the server. Check your connection and try again.');
+  }
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as Partial<ApiErrorBody> | null;
+    throw new ApiError(res.status, json?.error?.code ?? 'INTERNAL', json?.error?.message ?? 'Download failed', json?.error?.details);
+  }
+  const blob = await res.blob();
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export const newIdempotencyKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);

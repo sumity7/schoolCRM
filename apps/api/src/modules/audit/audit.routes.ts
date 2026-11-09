@@ -10,6 +10,7 @@ export function registerAuditRoutes(r: Registrar) {
       entityType: z.string().max(60).optional(),
       entityId: z.string().max(60).optional(),
       action: z.string().max(80).optional(),
+      actionPrefix: z.string().regex(/^[a-z_.]{1,40}$/).optional(),
       actorUserId: z.string().max(24).optional(),
     }).strict(),
     async handler({ query }) {

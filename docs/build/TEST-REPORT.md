@@ -26,7 +26,7 @@ Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8
 
 Static checks at the same commit: `tsc --noEmit` (strict) clean; `eslint apps packages --max-warnings 0` clean.
 
-## Browser E2E (Playwright) — checkpoint 2
+## Browser E2E (Playwright) — checkpoint 5
 
 Run: `cd apps/web && $env:MONGOMS_SYSTEM_BINARY="<mongod path>"; $env:PW_CHANNEL="msedge"; npx playwright test`
 (`PW_CHANNEL` drives an installed browser; without it Playwright's own Chromium must be installed.) The run starts an isolated in-memory
@@ -40,9 +40,12 @@ MongoDB replica set + the real API (`apps/api/scripts/e2e-server.ts`, synthetic 
 | E2E-03 | Tenant switching: data switches school; stale tab gets 409 and reloads into the new school; no cross-school admission numbers visible | pass | pass |
 | E2E-04 | Attendance: teacher sees only the assigned section; mark, simulated network drop → clear error → retry/double-click saves once; reload shows saved values; other section refused (403) | pass | pass |
 | E2E-05 | Mobile: no horizontal scroll, tap targets ≥ 36 px (controls are 44 px), hamburger menu, login → attendance → submit | pass | pass |
-| **Total** | 7 specs × 2 projects | **14 passed, 0 failed** | |
+| E2E-06 | Import wizard: upload CSV → columns auto-matched → check → problem row shown with reason → import 2 → students searchable → undo removes them; teacher has no Imports link and the API answers 403 | pass | pass |
+| E2E-07 | Add student → add guardian → portal blocked until verified → verify → enable portal → edit twice (no stale-version error) → export CSV download (BOM, re-importable headers) | pass | pass |
+| E2E-08 | Every one of the 13 owner sidebar screens loads with no error alert and no horizontal scroll; teacher sees no setup/admin links; owner creates class + section (capacity shown) and a holiday | pass | pass |
+| **Total** | 13 specs × 2 projects | **26 passed, 0 failed** | |
 
-Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a real phone have not been run; the Next.js *development* server was used (production-topology proxy of ADR-2 not yet exercised); E2E covers the screens that exist (auth, shell, dashboard, students list, attendance).
+Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a real phone have not been run; the Next.js *development* server was used (production-topology proxy of ADR-2 not yet exercised); Screen coverage is functional, not visual; accessibility has not been audited with a screen reader.
 
 ## Defects found by the tests and fixed (not hidden)
 1. `PlatformRepository.updateOne/updateMany/count/deleteMany/aggregate` returned lazy Mongoose queries that executed **after** the `runAsPlatform` scope ended → the tenancy plugin correctly failed closed ("Tenant context missing"). Fixed by awaiting inside the scope. (Demonstrates lock 3 fail-closed behaviour.)
@@ -53,6 +56,10 @@ Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a re
 
 5. Re-admitting a withdrawn student into another section kept the old roll number (Mongoose drops `undefined` from `$set`) and hit the roll-number unique index → fixed with explicit nulls; covered by the lifecycle test.
 6. The isolation harness initially failed on purpose for routes/resource kinds without a School B fixture (coverage gate) → fixtures and attack specs added for every id-bearing route.
+
+7. (E2E, checkpoint 5) The attendance "Saved N students" confirmation was cleared by the automatic refetch that follows a save (so it could vanish at once) → the message now resets only when section/date changes.
+8. (E2E) The import page overflowed horizontally at 360 px (grid items with truncated text need `min-width: 0`) → fixed.
+9. (E2E) Two test-side issues: a non-exact link name that became ambiguous once "Attendance reports" was added; a new test that created a class in the school the attendance tests count sections of → moved to the other school.
 
 ## Not yet covered (tracked in PROGRESS.md)
 - E2E on WebKit/Firefox and real devices; E2E against the production-style reverse-proxy topology.

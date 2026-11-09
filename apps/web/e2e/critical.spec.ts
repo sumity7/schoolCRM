@@ -185,7 +185,7 @@ test.describe('E2E-05 mobile workflows', () => {
 
     if (viewport && viewport.width < 768) {
       await page.getByRole('button', { name: 'Open menu' }).click();
-      await page.getByRole('link', { name: 'Attendance' }).click();
+      await page.getByRole('link', { name: 'Attendance', exact: true }).click();
     } else await page.goto('/app/attendance');
     await expect(page.getByTestId('row-alpha-A1')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), 'attendance scrolls horizontally').toBe(false);

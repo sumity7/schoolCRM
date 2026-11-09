@@ -69,12 +69,14 @@ export const AuditService = {
   },
 
   /** School-scoped read: ALWAYS filtered by the current tenant (never a caller-supplied school). */
-  async listForCurrentSchool(opts: { page: number; limit: number; entityType?: string; entityId?: string; action?: string; actorUserId?: string }) {
+  async listForCurrentSchool(opts: { page: number; limit: number; entityType?: string; entityId?: string; action?: string; actionPrefix?: string; actorUserId?: string }) {
     const t = requireTenant('audit.list');
     const filter: Record<string, unknown> = { schoolId: t.schoolId };
     if (opts.entityType) filter.entityType = opts.entityType;
     if (opts.entityId) filter.entityId = opts.entityId;
     if (opts.action) filter.action = opts.action;
+    // anchored prefix; the route allows only [a-z_.], and every regex metacharacter is escaped anyway
+    else if (opts.actionPrefix) filter.action = { $regex: `^${opts.actionPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}` };
     const actor = toObjectId(opts.actorUserId);
     if (actor) filter.actorUserId = actor;
     const [total, data] = await Promise.all([

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { CalendarCheck, GraduationCap, LayoutDashboard, LogOut, Menu, Moon, Sun, X } from 'lucide-react';
-import type { PermissionKey } from '@edunex/shared';
+import { BarChart3, Building2, CalendarCheck, CalendarDays, ClipboardCheck, GraduationCap, History, Layers, LayoutDashboard, LogOut, Menu, Moon, Sun, Upload, UserCog, Users, X } from 'lucide-react';
+import type { PermissionKey, Scope } from '@edunex/shared';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/primitives';
@@ -14,16 +14,35 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   perm?: PermissionKey;
+  /** Require at least school-wide scope (hides admin screens from teachers who hold the key only for their own records). */
+  schoolScope?: boolean;
 }
 
-/** Navigation is filtered by permissions for UX only; the API enforces everything. */
-const NAV: NavItem[] = [
-  { href: '/app', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/app/attendance', label: 'Attendance', icon: CalendarCheck, perm: 'attendance:read' },
-  { href: '/app/students', label: 'Students', icon: GraduationCap, perm: 'students:read' },
-  // Users, School settings and Audit log screens are not built yet — intentionally absent (no dead links).
+/** Navigation is filtered by permissions for UX only; the API enforces everything. Only built screens appear (no dead links). */
+const NAV: Array<{ group?: string; items: NavItem[] }> = [
+  {
+    items: [
+      { href: '/app', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/app/attendance', label: 'Attendance', icon: CalendarCheck, perm: 'attendance:read' },
+      { href: '/app/attendance/reports', label: 'Attendance reports', icon: BarChart3, perm: 'attendance:read' },
+      { href: '/app/attendance/corrections', label: 'Corrections', icon: ClipboardCheck, perm: 'attendance:approve' },
+      { href: '/app/students', label: 'Students', icon: GraduationCap, perm: 'students:read' },
+      { href: '/app/imports', label: 'Imports', icon: Upload, perm: 'imports:create' },
+      { href: '/app/staff', label: 'Staff', icon: Users, perm: 'staff:read', schoolScope: true },
+    ],
+  },
+  {
+    group: 'Setup',
+    items: [
+      { href: '/app/settings/academic-sessions', label: 'Academic sessions', icon: CalendarDays, perm: 'academics:create' },
+      { href: '/app/settings/classes', label: 'Classes & sections', icon: Layers, perm: 'academics:create' },
+      { href: '/app/settings/calendar', label: 'Holidays & events', icon: CalendarDays, perm: 'academics:create' },
+      { href: '/app/settings/users', label: 'Users & roles', icon: UserCog, perm: 'users:read' },
+      { href: '/app/settings/school', label: 'School settings', icon: Building2, perm: 'school.settings:update' },
+      { href: '/app/audit', label: 'Audit log', icon: History, perm: 'audit:read' },
+    ],
+  },
 ];
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { me, loading, can, logout } = useAuth();
   const path = usePathname();
@@ -67,18 +86,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const items = NAV.filter((n) => !n.perm || can(n.perm));
+  const scopeOf = (k: PermissionKey) => me.permissions.find((p) => p.key === k)?.scope as Scope | undefined;
+  const allowed = (n: NavItem) => !n.perm || (can(n.perm) && (!n.schoolScope || scopeOf(n.perm) === 'school'));
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter(allowed) })).filter((g) => g.items.length > 0);
+  // the most specific matching entry is the active one (/app/attendance/reports must not also light up /app/attendance)
+  const activeHref = groups.flatMap((g) => g.items).map((n) => n.href)
+    .filter((h) => (h === '/app' ? path === '/app' : path === h || path.startsWith(`${h}/`)))
+    .sort((a, b) => b.length - a.length)[0];
   const nav = (
-    <nav aria-label="Main" className="flex flex-col gap-1 p-3">
-      {items.map((n) => {
-        const active = n.href === '/app' ? path === '/app' : path.startsWith(n.href);
-        return (
-          <Link key={n.href} href={n.href} onClick={() => setOpen(false)} aria-current={active ? 'page' : undefined}
-            className={cn('flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground hover:bg-sidebar-active', active && 'bg-sidebar-active text-white')}>
-            <n.icon className="h-4 w-4" aria-hidden /> {n.label}
-          </Link>
-        );
-      })}
+    <nav aria-label="Main" className="flex flex-col gap-1 overflow-y-auto p-3">
+      {groups.map((g) => (
+        <div key={g.group ?? 'main'} className="flex flex-col gap-1">
+          {g.group ? <p className="mt-3 px-3 text-xs font-medium uppercase tracking-wide text-sidebar-foreground/60">{g.group}</p> : null}
+          {g.items.map((n) => {
+            const active = n.href === activeHref;
+            return (
+              <Link key={n.href} href={n.href} onClick={() => setOpen(false)} aria-current={active ? 'page' : undefined}
+                className={cn('flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground hover:bg-sidebar-active', active && 'bg-sidebar-active text-white')}>
+                <n.icon className="h-4 w-4" aria-hidden /> {n.label}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 

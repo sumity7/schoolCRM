@@ -154,7 +154,16 @@ export const AttendanceService = {
     const access = await AcademicsService.sectionAccess(tenant, scope);
     const filter: Record<string, unknown> = { status };
     if (!access.all) filter.sectionId = { $in: access.sectionIds };
-    return correctionRepo.paginate(filter, page, limit, { createdAt: -1 });
+    const res = await correctionRepo.paginate(filter, page, limit, { createdAt: -1 });
+    const students = await studentRepo.findByIds(res.data.map((c) => c.studentId), { select: 'firstName lastName admissionNo' });
+    const by = new Map(students.map((s) => [String(s._id), s]));
+    return {
+      meta: res.meta,
+      data: res.data.map((c) => {
+        const s = by.get(String(c.studentId));
+        return { ...c, studentName: s ? [s.firstName, s.lastName].filter(Boolean).join(' ') : null, admissionNo: s?.admissionNo ?? null };
+      }),
+    };
   },
 
   // ------------------------------------------------------------------ views & reports

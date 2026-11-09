@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AttendanceStatusValue } from '@edunex/shared';
-import { ApiError, get, put } from '@/lib/api';
+import { ApiError, errorText, get, post, put } from '@/lib/api';
+import { Modal } from '@/components/ui/modal';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { Alert, Button, Card, Input, Skeleton } from '@/components/ui/primitives';
@@ -29,6 +30,7 @@ export default function AttendancePage() {
   const [date, setDate] = useState(todayInIndia());
   const [marks, setMarks] = useState<Record<string, AttendanceStatusValue>>({});
   const [saved, setSaved] = useState<string | null>(null);
+  const [corrFor, setCorrFor] = useState<SheetStudent | null>(null);
 
   const sections = useQuery({
     queryKey: ['sections', me?.activeMembershipId],
@@ -50,8 +52,11 @@ export default function AttendancePage() {
     const next: Record<string, AttendanceStatusValue> = {};
     for (const s of sheet.data.students) if (s.status) next[s.studentId] = s.status;
     setMarks(next);
-    setSaved(null);
   }, [sheet.data]);
+  // The confirmation belongs to a section+date; the refetch that follows a save must not wipe it.
+  useEffect(() => {
+    setSaved(null);
+  }, [sectionId, date]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -89,7 +94,7 @@ export default function AttendancePage() {
 
       {!sections.isLoading && (sections.data?.length ?? 0) === 0 ? <Alert tone="info">No sections available. Ask your administrator to set up classes and assign you to a section.</Alert> : null}
       {sheet.data && !sheet.data.isWorkingDay ? <Alert tone="info">{sheet.data.notice ?? 'Not a working day'} — attendance cannot be marked.</Alert> : null}
-      {sheet.data?.locked ? <Alert tone="info">This date is locked for teachers. Ask the class teacher or admin for a correction.</Alert> : null}
+      {sheet.data?.locked ? <Alert tone="info">This date is locked for teachers. Use “Request change” next to a student; the class teacher or an admin approves it.</Alert> : null}
       {errorMessage ? <Alert>{errorMessage}</Alert> : null}
       {saved ? <Alert tone="success"><span data-testid="saved-msg">{saved}</span></Alert> : null}
 
@@ -108,6 +113,9 @@ export default function AttendancePage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{s.rollNo ? `${s.rollNo}. ` : ''}{s.name}</p>
                   <p className="text-xs text-muted-foreground">{s.admissionNo}</p>
+                  {sheet.data?.locked && can('attendance:update') ? (
+                    <button type="button" className="mt-1 min-h-9 text-xs font-medium text-primary hover:underline" onClick={() => setCorrFor(s)} data-testid={`request-change-${s.admissionNo}`}>Request change</button>
+                  ) : null}
                 </div>
                 <div className="flex gap-1.5" role="group" aria-label={`Attendance for ${s.name}`}>
                   {STATUSES.map((st) => (
@@ -130,6 +138,37 @@ export default function AttendancePage() {
           </div>
         </Card>
       ) : null}
+      {corrFor ? <CorrectionModal student={corrFor} date={date} onClose={() => setCorrFor(null)} /> : null}
     </div>
+  );
+}
+
+function CorrectionModal({ student, date, onClose }: { student: SheetStudent; date: string; onClose: () => void }) {
+  const [to, setTo] = useState<AttendanceStatusValue>(student.status === 'absent' ? 'present' : 'absent');
+  const [reason, setReason] = useState('');
+  const [done, setDone] = useState(false);
+  const m = useMutation({
+    mutationFn: async () => post('/attendance/corrections', { studentId: student.studentId, date, to, reason: reason.trim() }),
+    onSuccess: () => setDone(true),
+  });
+  return (
+    <Modal open onOpenChange={(o) => { if (!o) onClose(); }} title={`Request change — ${student.name}`} description={`${date} · currently ${student.status ? student.status.replace('_', ' ') : 'not marked'}`}>
+      {done ? (
+        <div className="space-y-3"><Alert tone="success">Request sent for approval.</Alert><Button onClick={onClose}>Close</Button></div>
+      ) : (
+        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
+          <label className="block text-sm"><span className="mb-1 block font-medium">Change to</span>
+            <select className="min-h-11 w-full rounded-lg border border-input bg-card px-3 text-sm" value={to} onChange={(e) => setTo(e.target.value as AttendanceStatusValue)}>
+              {STATUSES.map((st) => <option key={st.value} value={st.value}>{st.label}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm"><span className="mb-1 block font-medium">Reason (required)</span>
+            <Input required minLength={3} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </label>
+          {m.error ? <Alert>{errorText(m.error)}</Alert> : null}
+          <Button type="submit" disabled={m.isPending}>{m.isPending ? 'Sending…' : 'Send request'}</Button>
+        </form>
+      )}
+    </Modal>
   );
 }

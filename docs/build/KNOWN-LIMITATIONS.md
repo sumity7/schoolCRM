@@ -4,7 +4,9 @@
 The system is **not safe for live school data**. The Production-Readiness Gate (docs/phase-0/12 §10) has not been passed: no approved hosting, no backups/restore drill, no monitoring, no legal review, no funding path (D-26/D-28). Use synthetic data only.
 
 ## Current functional limits
-- See PROGRESS.md for what exists. Web UI covers auth, shell, dashboard, students list and attendance only.
+- See PROGRESS.md for what exists. Missing R1 screens: own profile / change password / session list (APIs exist), onboarding checklist, guardian directory.
+- Lookup dropdowns (staff for class-teacher/assignment pickers, user names in the audit log) load the first 100 records only.
+- The audit log shows the actor's name only for current members; actions are shown as technical keys (e.g. `students.updated`).
 - Email: development outbox only — no real email is sent (no provider authorised). Password-reset and invitation links appear in `apps/api/.data/mail/`.
 - Phone-number login is supported by the identity model, but there is no SMS adapter, so phone-only accounts cannot receive reset links.
 - Suspended/deactivated schools lose all access (no read-only/export mode until policy D-10 is decided).
