@@ -59,3 +59,4 @@ export const get = <T,>(path: string) => api<T>('GET', path);
 export const post = <T,>(path: string, body: Json = {}, opts?: { idempotencyKey?: string }) => api<T>('POST', path, body, opts);
 export const patch = <T,>(path: string, body: Json) => api<T>('PATCH', path, body);
 export const del = <T,>(path: string) => api<T>('DELETE', path);
+export const put = <T,>(path: string, body: Json) => api<T>('PUT', path, body);

@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e:api": "tsx scripts/e2e-server.ts",
     "seed:demo": "tsx --env-file-if-exists=.env scripts/seed-demo.ts",
     "cli": "tsx --env-file-if-exists=.env scripts/cli.ts"
   },
