@@ -156,6 +156,19 @@ export class TenantRepository<T extends object> {
     if (res.matchedCount === 0) throw notFound(what);
   }
 
+  /**
+   * Permanent delete — ONLY for non-historical data (calendar events, assignments). Financial/academic history
+   * must use soft delete or status transitions. Callers are reviewed for this.
+   */
+  async hardDeleteById(id: unknown, what?: string): Promise<void> {
+    const t = requireTenant(`${this.model.modelName}.hardDelete`);
+    if (t.readOnly) throw new TenantViolationError('Write attempted in a read-only (support) session');
+    const oid = toObjectId(id);
+    if (!oid) throw notFound(what);
+    const res = await this.model.deleteOne(this.scope({ _id: oid }, true) as never);
+    if (res.deletedCount === 0) throw notFound(what);
+  }
+
   async aggregate<R = unknown>(pipeline: PipelineStage[]): Promise<R[]> {
     const t = requireTenant(`${this.model.modelName}.aggregate`);
     const base: PipelineStage[] = [{ $match: { schoolId: t.schoolId, ...(this.softDelete ? { deletedAt: null } : {}) } }];

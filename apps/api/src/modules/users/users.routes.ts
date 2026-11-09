@@ -21,7 +21,7 @@ export function registerUserRoutes(r: Registrar, deps: { env: Env; email: EmailA
 
   r.define({
     method: 'post', path: '/users/invite', summary: 'Invite a staff member', tenancy: 'school', auth: 'session', permission: 'users:create', rateClass: 'sensitive',
-    body: z.object({ name: z.string().trim().min(1).max(120), email: z.string().trim().email().max(254), phone: z.string().trim().max(20).optional(), roleKeys: z.array(z.string().min(1).max(60)).min(1).max(5) }).strict(),
+    body: z.object({ name: z.string().trim().min(1).max(120), email: z.string().trim().email().max(254), phone: z.string().trim().max(20).optional(), roleKeys: z.array(z.string().min(1).max(60)).min(1).max(5), staffId: objectIdSchema.optional() }).strict(),
     audit: true,
     async handler({ body }) {
       const { membership } = await svc.invite(body);

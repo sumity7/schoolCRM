@@ -9,6 +9,7 @@ import { authTokens, schools, users } from '../auth/auth.repository';
 import { hashToken, newToken } from '../auth/crypto';
 import type { SessionService } from '../auth/session.service';
 import { membershipRepository } from '../memberships/memberships.repository';
+import { staffRepo } from '../staff/staff.repository';
 import { roleRepository } from '../roles/roles.repository';
 import { AuditService } from '../../core/audit/audit.service';
 import type { IUser } from './user.model';
@@ -64,11 +65,13 @@ export class UsersService {
     return unique;
   }
 
-  async invite(input: { name: string; email: string; phone?: string; roleKeys: string[] }) {
+  async invite(input: { name: string; email: string; phone?: string; roleKeys: string[]; staffId?: string }) {
     const tenant = requireTenant('users.invite');
     const id = classifyIdentifier(input.email);
     if (!id || id.kind !== 'email') throw validationFailed('A valid email is required');
     const roleKeys = await this.validateRoles(tenant, input.roleKeys);
+    // Link to a staff profile: this is what makes teacher-scope ('assigned') permissions meaningful.
+    const staff = input.staffId ? await staffRepo.getById(input.staffId, 'Staff member') : null;
 
     const school = await schools.findById(tenant.schoolId, 'users: staff limit');
     const staffCount = await membershipRepository.countStaff();
@@ -81,8 +84,9 @@ export class UsersService {
     const existing = await membershipRepository.findOne({ userId: user!._id });
     if (existing && existing.status === 'active') throw conflict('This person is already a member of your school');
     const membership = existing
-      ? await membershipRepository.updateById(existing._id, { roleKeys, status: 'invited', endedAt: null })
-      : await membershipRepository.create({ userId: user!._id, roleKeys, personType: 'staff', status: 'invited', invitedBy: tenant.membershipId });
+      ? await membershipRepository.updateById(existing._id, { roleKeys, status: 'invited', endedAt: null, ...(staff ? { personId: staff._id } : {}) })
+      : await membershipRepository.create({ userId: user!._id, roleKeys, personType: 'staff', status: 'invited', invitedBy: tenant.membershipId, ...(staff ? { personId: staff._id } : {}) });
+    if (staff) await staffRepo.updateById(staff._id, { userId: user!._id });
 
     const token = newToken();
     await authTokens.create(

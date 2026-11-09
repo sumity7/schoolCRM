@@ -4,6 +4,11 @@ import { setupTestDb, teardownTestDb, clearAll } from './helpers/db';
 import { Client, loggedIn, makeTestApp, seedMember, seedSchool, type SeededSchool } from './helpers/app';
 import { _auditRowsForTest } from '../src/core/audit/audit.service';
 import { memberships, sessions } from '../src/modules/auth/auth.repository';
+import mongoose, { Types } from 'mongoose';
+import { buildSchoolData, todayIst, type SchoolData } from './helpers/fixtures';
+import { modelRegistry } from '../src/core/tenancy/registry';
+import { runAsPlatform } from '../src/core/tenancy/context';
+import { AttendanceCorrectionModel } from '../src/modules/attendance/attendance.model';
 import type { ManifestEntry } from '../src/core/http/route';
 
 const t = makeTestApp();
@@ -61,42 +66,82 @@ describe('REQ-RBAC route manifest (deny-by-default, doc 06 lock 4)', () => {
   });
 });
 
-describe('REQ-TEN isolation harness v1 — every school route attacked with the other tenant\'s identity', () => {
-  /** Fixture ids belonging to SCHOOL B, by resource kind. Add a kind here when a module introduces one. */
-  const fixtures = async (): Promise<Record<string, string>> => {
-    const bTeacher = await seedMember(B.schoolId, 'teacher@bravo.test', ['teacher']);
-    return { membership: String(bTeacher.membershipId) };
-  };
-
-  it('every id-bearing route returns 404 for School B ids and changes nothing', async () => {
-    const fx = await fixtures();
-    const ownerA = await loggedIn(app, A.ownerEmail);
-    const manifest = registrar.manifest.filter((m) => m.tenancy === 'school' && m.idParams);
-    expect(manifest.length).toBeGreaterThan(0);
-    const before = await memberships.find({ schoolId: B.schoolId }, 'test snapshot');
-    for (const m of manifest) {
-      const path = m.path.replace('/api/v1', '').replace(/:(\w+)/g, (_s, p: string) => {
-        const kind = m.idParams![p];
-        if (!kind || !fx[kind]) throw new Error(`Isolation harness has no fixture for resource kind "${kind}" (${m.method} ${m.path}) — add one`);
-        return fx[kind]!;
-      });
-      const body = m.method === 'patch' ? { status: 'suspended' } : {};
-      const res = await (ownerA as unknown as Record<string, (p: string, b?: unknown) => Promise<{ status: number }>>)[m.method]!(path, body);
-      expect(res.status, `${m.method.toUpperCase()} ${m.path} with a School B id`).toBe(404);
-    }
-    const after = await memberships.find({ schoolId: B.schoolId }, 'test snapshot');
-    expect(JSON.stringify(after)).toBe(JSON.stringify(before));
+describe("REQ-TEN isolation harness v2 — every school route attacked with the other tenant's identity", () => {
+  /** Request shapes that pass validation, so the attack reaches the handler and the 404 is the TENANT answer. */
+  const specs = (bd: SchoolData): Record<string, { body?: object; query?: string }> => ({
+    'patch /academics/sessions/:id': { body: { name: 'Hack' } }, 'post /academics/sessions/:id/activate': {}, 'post /academics/sessions/:id/close': {},
+    'patch /classes/:id': { body: { name: 'x' } }, 'delete /classes/:id': {}, 'patch /sections/:id': { body: { name: 'x' } }, 'delete /sections/:id': {},
+    'delete /subjects/:id': {}, 'delete /academics/teacher-assignments/:id': {}, 'delete /academics/calendar/events/:id': {},
+    'get /staff/:id': {}, 'patch /staff/:id': { body: { name: 'x' } }, 'post /staff/:id/status': { body: { status: 'on_leave' } },
+    'get /students/:id': {}, 'patch /students/:id': { body: { firstName: 'x' } }, 'post /students/:id/status': { body: { status: 'withdrawn' } },
+    'get /students/:id/guardians': {}, 'post /students/:id/guardians': { body: { name: 'g', phone: '9000000000', relationship: 'father' } },
+    'patch /students/:id/guardians/:linkId': { body: { verified: true } }, 'get /academics/sections/:id/roster': {},
+    'get /attendance/sections/:sectionId': { query: `?date=${todayIst()}` },
+    'put /attendance/sections/:sectionId': { body: { date: todayIst(), entries: [{ studentId: bd.studentsA[0], status: 'present' }] } },
+    'get /attendance/students/:studentId': { query: `?from=${todayIst()}&to=${todayIst()}` },
+    'post /attendance/corrections/:id/approve': { body: {} }, 'post /attendance/corrections/:id/reject': { body: {} },
+    'patch /users/:membershipId': { body: { status: 'suspended' } },
   });
 
-  it('lists never leak across schools and totals count only own rows', async () => {
-    await seedMember(B.schoolId, 'teacher@bravo.test', ['teacher']);
-    await seedMember(A.schoolId, 'teacher@alpha.test', ['teacher']);
-    const ownerA = await loggedIn(app, A.ownerEmail);
-    const res = await ownerA.get('/users');
-    expect(res.body.meta.total).toBe(2);
-    expect(res.body.data.map((u: { email: string }) => u.email).sort()).toEqual(['owner@alpha.test', 'teacher@alpha.test']);
-    const audit = await ownerA.get('/audit-logs');
-    for (const row of audit.body.data) expect(row.entityId === undefined || typeof row.entityId === 'string').toBe(true);
+  const snapshotSchool = async (schoolId: Types.ObjectId) => {
+    const out: Record<string, unknown[]> = {};
+    for (const [name, info] of modelRegistry) {
+      if (info.kind !== 'tenant') continue;
+      out[name] = await runAsPlatform('test: snapshot', async () => await mongoose.models[name]!.find({ schoolId }).sort({ _id: 1 }).lean());
+    }
+    return JSON.stringify(out);
+  };
+
+  async function twoSchools() {
+    const HA = await buildSchoolData(app, 'harna');
+    const HB = await buildSchoolData(app, 'harnb');
+    const bCorrection = await runAsPlatform('test: B correction', async () =>
+      AttendanceCorrectionModel.create({ schoolId: HB.school.schoolId, studentId: new Types.ObjectId(HB.studentsA[0]), sectionId: new Types.ObjectId(HB.sectionA), date: '2026-01-05', to: 'present', reason: 'fixture', requestedBy: new Types.ObjectId(), status: 'pending' }));
+    const fx: Record<string, string> = {
+      session: HB.sessionId, class: HB.classId, section: HB.sectionA, subject: HB.subjectId, assignment: HB.assignmentId, event: HB.eventId,
+      staff: HB.teacherStaffId, student: HB.studentsA[0]!, guardian_link: HB.guardianLinkId, correction: String(bCorrection._id), membership: String(HB.teacherMembershipId),
+    };
+    return { HA, HB, fx };
+  }
+
+  it("every id-bearing route returns 404 for School B ids, and School B's data is byte-for-byte unchanged", async () => {
+    const { HA, HB, fx } = await twoSchools();
+    const sp = specs(HB);
+    const routes = registrar.manifest.filter((m) => m.tenancy === 'school' && m.idParams);
+    expect(routes.length).toBeGreaterThan(25);
+    const before = await snapshotSchool(HB.school.schoolId);
+    for (const m of routes) {
+      const key = `${m.method} ${m.path.replace('/api/v1', '')}`;
+      const spec = sp[key];
+      if (!spec) throw new Error(`Isolation harness has no attack spec for "${key}" — add one so the route is covered`);
+      const path = m.path.replace('/api/v1', '').replace(/:(\w+)/g, (_s, p: string) => {
+        const kind = m.idParams![p];
+        if (!kind || !fx[kind]) throw new Error(`Isolation harness has no fixture for resource kind "${kind}" (${key}) — add one`);
+        return fx[kind]!;
+      });
+      const res = await (HA.owner as unknown as Record<string, (p: string, b?: unknown) => Promise<{ status: number }>>)[m.method]!(`${path}${spec.query ?? ''}`, spec.body ?? {});
+      expect(res.status, `${key} with a School B id`).toBe(404);
+    }
+    expect(await snapshotSchool(HB.school.schoolId)).toBe(before);
+  });
+
+  it("every collection route returns only the caller's own rows (no School B id appears anywhere)", async () => {
+    const { HA, HB } = await twoSchools();
+    const bIds = [HB.sessionId, HB.classId, HB.sectionA, HB.sectionB, HB.subjectId, HB.teacherStaffId, HB.assignmentId, HB.eventId, HB.guardianLinkId, ...HB.studentsA, ...HB.studentsB, String(HB.school.schoolId), String(HB.teacherMembershipId)];
+    const routes = registrar.manifest.filter((m) => m.method === 'get' && m.tenancy === 'school' && !m.path.includes(':'));
+    const queries: Record<string, string> = { '/attendance/reports/monthly': `?sectionId=${HA.sectionA}&month=${todayIst().slice(0, 7)}` };
+    let checked = 0;
+    for (const m of routes) {
+      const p = m.path.replace('/api/v1', '');
+      const res = await HA.owner.get(`${p}${queries[p] ?? ''}`);
+      if (res.status === 400) continue; // route needs params we did not supply (covered by the id-route attack)
+      expect(res.status, p).toBe(200);
+      const text = JSON.stringify(res.body);
+      for (const id of bIds) expect(text.includes(id), `${p} leaked School B id ${id}`).toBe(false);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(10);
+    expect((await HA.owner.get('/students')).body.meta.total).toBe(6);
   });
 
   it('payload schoolId is rejected (strict schemas), never trusted', async () => {

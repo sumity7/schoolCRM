@@ -38,3 +38,9 @@ Authority order when documents conflict: (1) security/privacy/tenant isolation �
 | E-10 | Login failures return one generic 401 for unknown / bad password / locked / disabled | No user enumeration. |
 | E-11 | Suspended/deactivated schools block staff access (no read-only mode yet) | Policy D-10 (grace/read-only/export) still open; safest default now. Known limitation. |
 | E-12 | Rate limiting uses in-memory store (single process) | Adequate for one-VPS pilot; documented in KNOWN-LIMITATIONS; swap store when scaling out. |
+| E-13 | Services may import OTHER modules' repositories (read/validate refs), never their models or routes; cross-tenant access stays restricted to auth/users/schools/platform | Pragmatic reading of doc 09 §2 for a modular monolith; lint still forbids model imports and PlatformRepository outside the allow-list. |
+| E-14 | Attendance = one document per student per day, saved with a single transactional `bulkWrite` upsert; unique `(schoolId, studentId, date)` | doc 04 §11. All-or-nothing save is tested. |
+| E-15 | Teacher edit window (`attendancePolicy.teacherEditWindowDays`, default 0 = same day): older dates are locked for `assigned`-scope users (409) and changed via a correction request approved by someone else; `school`-scope users may edit with a full audit diff | D-21 default; configurable per school. |
+| E-16 | Attendance percentage = present-equivalent units / (marked days − excused days); late counts per policy, half-day weight per policy | Shared pure function `summariseAttendance` (unit-tested). Policy values are per-school data (D-01). |
+| E-17 | Students list for `own` scope (parent/student) is refused on `/students`; parents use portal endpoints in R3 | Keeps parent access strictly through verified guardian links. |
+| E-18 | Mongoose `undefined` is dropped from `$set`; repositories must write explicit `null` to clear fields | Found by tests (re-admission bug). |

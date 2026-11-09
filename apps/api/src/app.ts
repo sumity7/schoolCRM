@@ -13,6 +13,10 @@ import { registerAuthRoutes } from './modules/auth/auth.routes';
 import { registerSchoolRoutes } from './modules/schools/schools.routes';
 import { registerUserRoutes } from './modules/users/users.routes';
 import { registerAuditRoutes } from './modules/audit/audit.routes';
+import { registerAcademicsRoutes } from './modules/academics/academics.routes';
+import { registerStaffRoutes } from './modules/staff/staff.routes';
+import { registerStudentRoutes } from './modules/students/students.routes';
+import { registerAttendanceRoutes } from './modules/attendance/attendance.routes';
 
 export interface AppDeps {
   env: Env;
@@ -71,6 +75,10 @@ export function createApp(deps: AppDeps): BuiltApp {
   registerSchoolRoutes(registrar);
   registerUserRoutes(registrar, { env, email: deps.email, sessions: sessionService });
   registerAuditRoutes(registrar);
+  registerAcademicsRoutes(registrar);
+  registerStaffRoutes(registrar);
+  registerStudentRoutes(registrar);
+  registerAttendanceRoutes(registrar);
 
   app.use(API_BASE, router);
   app.use(notFoundHandler());
