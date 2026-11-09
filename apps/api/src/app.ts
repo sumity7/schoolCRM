@@ -1,0 +1,79 @@
+import express, { Router, type Express } from 'express';
+import helmet from 'helmet';
+import type { Env } from './config/env';
+import type { Logger } from './core/logging/logger';
+import type { EmailAdapter } from './core/notifications/email';
+import { createRegistrar, type Registrar } from './core/http/route';
+import { errorHandler, makeLimiters, noStore, notFoundHandler, rejectOperatorKeys, requestContextMiddleware, type LimiterConfig } from './core/http/middleware';
+import { dbReady } from './core/db/connection';
+import { AuthService } from './modules/auth/auth.service';
+import { SessionService, policyFromEnv } from './modules/auth/session.service';
+import { attachAuth } from './modules/auth/auth.middleware';
+import { registerAuthRoutes } from './modules/auth/auth.routes';
+import { registerSchoolRoutes } from './modules/schools/schools.routes';
+import { registerUserRoutes } from './modules/users/users.routes';
+import { registerAuditRoutes } from './modules/audit/audit.routes';
+
+export interface AppDeps {
+  env: Env;
+  logger: Logger;
+  email: EmailAdapter;
+  limiters?: LimiterConfig['overrides'];
+}
+
+export interface BuiltApp {
+  app: Express;
+  registrar: Registrar;
+  sessions: SessionService;
+  auth: AuthService;
+}
+
+export const API_BASE = '/api/v1';
+
+export function createApp(deps: AppDeps): BuiltApp {
+  const { env, logger } = deps;
+  const app = express();
+  app.disable('x-powered-by');
+  app.set('trust proxy', env.TRUST_PROXY_HOPS);
+  app.set('query parser', 'simple');
+
+  app.use(requestContextMiddleware);
+  app.use(
+    helmet({
+      // Pure JSON API: lock everything down.
+      contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
+      crossOriginResourcePolicy: { policy: 'same-origin' },
+      referrerPolicy: { policy: 'no-referrer' },
+    }),
+  );
+  app.use(noStore);
+
+  // Liveness/readiness — no data, no auth.
+  app.get('/health/live', (_req, res) => res.json({ status: 'ok' }));
+  app.get('/health/ready', (_req, res) => (dbReady() ? res.json({ status: 'ready' }) : res.status(503).json({ status: 'not_ready' })));
+
+  app.use(express.json({ limit: '100kb', strict: true, type: 'application/json' }));
+  app.use(rejectOperatorKeys);
+
+  const sessionService = new SessionService(policyFromEnv(env));
+  const authService = new AuthService({ env, sessions: sessionService, email: deps.email });
+  app.use(attachAuth(env, sessionService));
+
+  const router = Router();
+  const registrar = createRegistrar({
+    router,
+    basePath: API_BASE,
+    allowedOrigins: env.ALLOWED_ORIGINS,
+    limiters: makeLimiters({ enabled: env.RATE_LIMIT_ENABLED, overrides: deps.limiters }),
+  });
+
+  registerAuthRoutes(registrar, { env, auth: authService, sessions: sessionService });
+  registerSchoolRoutes(registrar);
+  registerUserRoutes(registrar, { env, email: deps.email, sessions: sessionService });
+  registerAuditRoutes(registrar);
+
+  app.use(API_BASE, router);
+  app.use(notFoundHandler());
+  app.use(errorHandler(logger));
+  return { app, registrar, sessions: sessionService, auth: authService };
+}

@@ -1,0 +1,31 @@
+{
+  "name": "edunex-erp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EduNex ERP — School Management. Simplified. (multi-tenant school ERP SaaS)",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "test": "npm run test --workspace @edunex/api",
+    "test:api": "npm run test --workspace @edunex/api",
+    "test:e2e": "npm run test:e2e --workspace @edunex/web",
+    "build": "npm run build --workspaces --if-present",
+    "dev:db": "npm run dev:db --workspace @edunex/api",
+    "dev:api": "npm run dev --workspace @edunex/api",
+    "dev:web": "npm run dev --workspace @edunex/web",
+    "seed:demo": "npm run seed:demo --workspace @edunex/api",
+    "check": "npm run typecheck && npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "typescript-eslint": "^8.72.1"
+  }
+}
