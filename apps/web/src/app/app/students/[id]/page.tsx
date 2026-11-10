@@ -104,7 +104,7 @@ export default function StudentDetailPage() {
                 <>
                   <p className="text-3xl font-semibold" data-testid="attendance-pct">{history.data.summary.percentage ?? '—'}%</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {history.data.summary.markedDays} days marked · {history.data.summary.present} present · {history.data.summary.absent} absent · {history.data.summary.late} late · {history.data.summary.halfDay} half-day · {history.data.summary.excused} excused
+                    {history.data.summary.markedDays} {history.data.summary.markedDays === 1 ? "day" : "days"} marked · {history.data.summary.present} present · {history.data.summary.absent} absent · {history.data.summary.late} late · {history.data.summary.halfDay} half-day · {history.data.summary.excused} excused
                   </p>
                   <div className="mt-3 flex flex-wrap gap-1" aria-label="Recent days">
                     {history.data.records.slice(-30).map((r) => (

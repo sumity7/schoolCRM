@@ -35,6 +35,8 @@ export const AttendanceRecordModel = defineTenantModel<IAttendanceRecord>(
     s.index({ schoolId: 1, studentId: 1, date: 1 }, { unique: true });
     s.index({ schoolId: 1, sectionId: 1, date: 1 });
     s.index({ schoolId: 1, sessionId: 1, studentId: 1, date: 1 });
+    // covering index for whole-school session reports (low attendance): answered from the index, no document fetch
+    s.index({ schoolId: 1, sessionId: 1, date: 1, studentId: 1, status: 1 });
   },
 );
 

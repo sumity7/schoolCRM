@@ -59,3 +59,18 @@ describe('shared: permission catalogue and role templates', () => {
     expect(scopeAtLeast(undefined, 'own')).toBe(false);
   });
 });
+
+describe('attendance summary from counts', () => {
+  it('summariseCounts gives exactly the same result as summariseAttendance for every policy', async () => {
+    const { summariseAttendance, summariseCounts } = await import('@edunex/shared');
+    const all = ['present', 'absent', 'late', 'half_day', 'excused'] as const;
+    for (let seed = 1; seed < 200; seed++) {
+      const statuses = Array.from({ length: seed % 37 }, (_, i) => all[(i * seed + seed) % 5]!);
+      const c = { present: 0, absent: 0, late: 0, halfDay: 0, excused: 0 };
+      for (const s of statuses) c[s === 'half_day' ? 'halfDay' : s]++;
+      for (const policy of [{ lateCountsAsPresent: true, halfDayWeight: 0.5 }, { lateCountsAsPresent: false, halfDayWeight: 1 }, { lateCountsAsPresent: false, halfDayWeight: 0 }]) {
+        expect(summariseCounts(c, policy)).toEqual(summariseAttendance(statuses, policy));
+      }
+    }
+  });
+});

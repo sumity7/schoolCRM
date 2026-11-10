@@ -1,0 +1,22 @@
+[Unit]
+Description=EduNex web (Next.js standalone)
+After=network-online.target edunex-api.service
+
+[Service]
+Type=simple
+User=edunex
+Group=edunex
+WorkingDirectory=/opt/edunex/current/web
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node apps/web/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

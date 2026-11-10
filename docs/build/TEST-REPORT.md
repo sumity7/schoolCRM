@@ -10,7 +10,7 @@ npx vitest run
 Tests use one in-memory MongoDB **replica set** (real transactions) with one database per test file. Synthetic data only.
 Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8.3.4 (local), Vitest 3.2.7.
 
-## Latest run — checkpoint 6 (2026-11-10, session 2)
+## Latest run — checkpoint 7 (2026-11-10, session 2)
 
 | Suite | File | Tests | Result |
 |---|---|---|---|
@@ -23,7 +23,7 @@ Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8
 | Lint canaries (the architecture rules actually fire) | `test/lint-rules.test.ts` | 4 | **4 passed** |
 | Import/export: CSV parser + formula-injection sanitiser, date parsing, mapping; 1,000-row/30-bad acceptance, re-import duplicates, class/section/roll/capacity/plan-limit validation, sibling guardian reuse, idempotent commit, rollback of untouched rows only, transaction-join proof, RBAC; student + attendance CSV exports (audited, re-importable) | `test/imports.test.ts` | 17 | **17 passed** |
 | Backups & tenant portability: encrypted archive round trip with digest verification, wrong passphrase / tampering / truncation write nothing, short passphrase refused, existing file never overwritten, restore drill, GFS retention, export → purge (guards, other school byte-identical, sessions die) → restore → password reset | `test/backup.test.ts` | 6 | **6 passed** |
-| **Total** | 9 files | **141** | **141 passed, 0 failed, 0 skipped** |
+| **Total** | 9 files | **142** | **142 passed, 0 failed, 0 skipped** |
 
 Static checks at the same commit: `tsc --noEmit` (strict) clean; `eslint apps packages --max-warnings 0` clean.
 
@@ -47,6 +47,33 @@ MongoDB replica set + the real API (`apps/api/scripts/e2e-server.ts`, synthetic 
 | **Total** | 13 specs × 2 projects | **26 passed, 0 failed** | |
 
 Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a real phone have not been run; the Next.js *development* server was used (production-topology proxy of ADR-2 not yet exercised); Screen coverage is functional, not visual; accessibility has not been audited with a screen reader.
+
+## Performance (checkpoint 7)
+`npx tsx scripts/perf.ts` — throw-away replica set; school "perf": 2,000 students imported through the real import API,
+36 sections, ~6 months of attendance; school "noise": 500 students; 333,500 attendance records in total. All requests over
+real HTTP; MongoDB profiler on during measurement. Local Windows machine, DB and API on the same host. Final run:
+
+| Request | p50 ms | p95 ms | target p95 |
+|---|---|---|---|
+| students list / search / section filter | 13 / 18 / 14 | 16 / 24 / 17 | < 500 |
+| student profile / 60-day attendance history | 9 / 14 | 16 / 26 | < 500 |
+| attendance sheet (section, today) | 15 | 23 | < 500 |
+| monthly report (section) | 24 | 34 | < 500 |
+| low-attendance report (whole school, session) | 359 | 476 | < 1,500 |
+| save attendance, 60 students | 34 | 42 | < 1,500 |
+| students list, 10 concurrent users | 47 | 72 | < 500 |
+| export 2,060 students (CSV) | 120 | 127 | < 3,000 |
+
+No COLLSCAN on application collections. First run found the low-attendance report at p95 4.8 s (all records loaded into Node)
+→ fixed with a DB-side aggregation (p95 2.3 s) plus a covering index (p95 0.48 s). The 2,000-row import commit took 2.2–6.9 s
+across runs (no target; machine load varied). Limits: one machine, loopback network, synthetic data, no production host.
+
+## Production build checks (checkpoint 7)
+Bundled API (`dist/server.js`, `dist/cli.js`) served health/login/students and bound 127.0.0.1; production mode refused a
+localhost DB and an http base URL. Next standalone build served pages, static assets, security headers and the full CSP;
+a real Edge session logged in, used 6 screens, downloaded the CSV and switched theme with **no CSP violations or page errors**.
+Found while doing this: with the API on IPv4 loopback, the rewrite target `http://localhost:4000` could resolve to IPv6 `::1`
+and miss the API → targets changed to `127.0.0.1`. Caddy/systemd were NOT exercised (not installed here).
 
 ## Backup/restore rehearsal (real CLI, checkpoint 6)
 `npx tsx scripts/backup-rehearsal.ts` — throw-away replica set (MongoDB 8.3.4 binary), 2 synthetic schools × 80 students seeded via the API,
@@ -81,8 +108,13 @@ Limits: tiny synthetic dataset on a local machine; not yet run on a production h
 11. (backup tests) Writing through a raw fd taken from a `FileHandle` let garbage collection close it mid-write → the handle's own stream is used.
 12. (rehearsal #1) The rehearsal harness used `spawnSync`, blocking the event loop that drains the in-memory mongod's log pipe; mongod stalled and the run hung during the drill → async spawn with a per-step timeout. Six processes of that hung run could not be stopped from this session (permission policy) and are listed in PROGRESS.md.
 
+13. (perf) Whole-school low-attendance report too slow (p95 4.8 s) → aggregation + covering index; `summariseCounts` proven equal to `summariseAttendance` by a unit test.
+14. (prod build) Next standalone bundle traced files from the wrong root (a stray lockfile in the user folder) → `outputFileTracingRoot` set.
+15. (prod build) `localhost` vs `127.0.0.1` rewrite target (IPv6 resolution) → explicit IPv4.
+16. (run) `scripts/dev-db.ts` left an unusable data folder after a failed first start → `DEV_DB_PATH` override added; the broken folder `apps/api/.data/mongo` is left for the user to delete.
+
 ## Not yet covered (tracked in PROGRESS.md)
 - E2E on WebKit/Firefox and real devices; E2E against the production-style reverse-proxy topology.
 - Tests for modules not yet built (fees, exams, portals, …). Import UI is not yet E2E-tested.
 - Background job queue tests (R3), PDF Hindi rendering spike (R2).
-- Performance test with a realistic dataset; restore drill on the real host with off-site storage (Phase 7).
+- Restore drill and performance on the real host; Caddy/systemd/TLS; E2E against the proxy topology; external security review.

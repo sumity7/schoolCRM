@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { isoWeekday, isValidDay, summariseAttendance, todayInTz, type AttendanceStatusValue, type Scope } from '@edunex/shared';
+import { isoWeekday, isValidDay, summariseAttendance, summariseCounts, todayInTz, type AttendanceStatusValue, type Scope } from '@edunex/shared';
 import { conflict, notFound, validationFailed, AppError } from '../../core/errors';
 import { AuditService } from '../../core/audit/audit.service';
 import { withTransaction } from '../../core/db/connection';
@@ -214,17 +214,36 @@ export const AttendanceService = {
     const ef: Record<string, unknown> = { sessionId: session._id, status: 'active' };
     if (sectionIds) ef.sectionId = { $in: sectionIds };
     const enr = await enrollmentRepo.find(ef);
-    const recs = await attendanceRepo.find({ sessionId: session._id, studentId: { $in: enr.map((e) => e.studentId) }, date: { $lte: today } }, { select: 'studentId status' });
-    const by = new Map<string, AttendanceStatusValue[]>();
-    for (const r of recs) by.set(String(r.studentId), [...(by.get(String(r.studentId)) ?? []), r.status]);
-    const students = await studentRepo.findByIds(enr.map((e) => e.studentId));
-    const sBy = new Map(students.map((s) => [String(s._id), s]));
+    // Counting happens IN the database (one row per student) — pulling every record into Node took ~4 s for a
+    // 2,000-student school with 6 months of data (perf run 2026-11-10).
+    const match: Record<string, unknown> = { sessionId: session._id, date: { $lte: today } };
+    // restricted views count each listed student's records across ALL their sections this session (section changes)
+    if (sectionIds) match.studentId = { $in: enr.map((e) => e.studentId) };
+    const counted = await attendanceRepo.aggregate<{ _id: Types.ObjectId; present: number; absent: number; late: number; halfDay: number; excused: number }>([
+      { $match: match },
+      {
+        $group: {
+          _id: '$studentId',
+          present: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } },
+          absent: { $sum: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] } },
+          late: { $sum: { $cond: [{ $eq: ['$status', 'late'] }, 1, 0] } },
+          halfDay: { $sum: { $cond: [{ $eq: ['$status', 'half_day'] }, 1, 0] } },
+          excused: { $sum: { $cond: [{ $eq: ['$status', 'excused'] }, 1, 0] } },
+        },
+      },
+    ]);
+    const by = new Map(counted.map((c) => [String(c._id), c]));
+    const zero = { present: 0, absent: 0, late: 0, halfDay: 0, excused: 0 };
     const threshold = settings.attendancePolicy.lowAttendanceThresholdPct;
+    const low = enr
+      .map((e) => ({ e, s: summariseCounts(by.get(String(e.studentId)) ?? zero, settings.attendancePolicy) }))
+      .filter((x) => x.s.markedDays >= 5 && x.s.percentage !== null && x.s.percentage < threshold);
+    const students = await studentRepo.findByIds(low.map((x) => x.e.studentId), { select: 'firstName lastName' });
+    const sBy = new Map(students.map((s) => [String(s._id), s]));
     return {
       threshold,
-      rows: enr
-        .map((e) => ({ studentId: String(e.studentId), sectionId: String(e.sectionId), name: [sBy.get(String(e.studentId))?.firstName, sBy.get(String(e.studentId))?.lastName].filter(Boolean).join(' '), ...summariseAttendance(by.get(String(e.studentId)) ?? [], settings.attendancePolicy) }))
-        .filter((r) => r.markedDays >= 5 && r.percentage !== null && r.percentage < threshold)
+      rows: low
+        .map(({ e, s }) => ({ studentId: String(e.studentId), sectionId: String(e.sectionId), name: [sBy.get(String(e.studentId))?.firstName, sBy.get(String(e.studentId))?.lastName].filter(Boolean).join(' '), ...s }))
         .sort((a, b) => (a.percentage ?? 0) - (b.percentage ?? 0)),
     };
   },

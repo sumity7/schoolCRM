@@ -29,5 +29,10 @@ The system is **not safe for live school data**. The Production-Readiness Gate (
 - Purging a school does not remove it from older backups until they age out of retention (≤ 6 months).
 - Restored user accounts have no password (credentials are never exported); people use "Forgot password", which needs working email — dev outbox only today.
 
+## Security & deployment (checkpoint 7)
+- Accepted dependency advisories (see SECURITY-REPORT.md S-5/S-6): zod 3 (mitigated by body-size caps) and postcss inside Next (build-time only). Upgrades to zod 4 and Next 16 are breaking and scheduled, not done.
+- CSP still allows inline scripts (no nonces yet). Import batches retain raw uploaded rows until a retention rule is decided.
+- The deployment kit (Caddy, systemd, rclone) is written but has never run on a Linux host; performance numbers come from one local machine.
+
 ## Environment
 - Tests use `mongodb-memory-server` (downloads ~590 MB of `mongod` on first run). Pinned `MONGOMS_VERSION` must match the production MongoDB major version once hosting is chosen.

@@ -11,7 +11,7 @@ async function main() {
   if (env.NODE_ENV !== 'production') await ensureIndexes(); // production runs `npm run cli -- sync-indexes` as a deploy step
   const email = env.EMAIL_ADAPTER === 'disabled' ? new DisabledEmailAdapter() : new DevEmailAdapter(logger);
   const { app } = createApp({ env, logger, email });
-  const server = app.listen(env.PORT, () => logger.info({ port: env.PORT, env: env.NODE_ENV, label: env.APP_ENV_LABEL }, 'EduNex API listening'));
+  const server = app.listen(env.PORT, env.HOST, () => logger.info({ host: env.HOST, port: env.PORT, env: env.NODE_ENV, label: env.APP_ENV_LABEL }, 'EduNex API listening'));
 
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'shutting down');

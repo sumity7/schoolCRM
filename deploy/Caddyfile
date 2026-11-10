@@ -1,0 +1,54 @@
+# EduNex single-VPS reverse proxy (ADR-2). One origin: /api/* → Express, everything else → Next.js.
+# Caddy obtains and renews the TLS certificate automatically once the domain's DNS points at this server.
+# Replace app.example.in with your domain (a domain costs money — D-28: not purchased yet).
+
+app.example.in {
+	encode zstd gzip
+
+	# Security headers for every response (the apps set their own too; these are the outer guarantee).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# Health endpoints are NOT exposed publicly; monitor them from the server itself.
+	@health path /health/*
+	respond @health 404
+
+	# Uploads: the API accepts at most ~4 MB (CSV import); refuse anything larger at the edge.
+	request_body {
+		max_size 5MB
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:4000 {
+			# Express runs with TRUST_PROXY_HOPS=1 and reads X-Forwarded-For set here (rate limiting, audit IPs).
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	log {
+		output file /var/log/caddy/edunex-access.log {
+			roll_size 50MiB
+			roll_keep 10
+		}
+		# Never log cookies or query strings that could carry tokens.
+		format filter {
+			wrap json
+			fields {
+				request>headers>Cookie delete
+				request>uri query {
+					delete token
+				}
+			}
+		}
+	}
+}

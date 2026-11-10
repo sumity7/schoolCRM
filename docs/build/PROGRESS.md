@@ -3,7 +3,7 @@
 > **Resume rule:** read this file first. Continue from "NEXT ACTION". Do not re-ask decisions listed in DECISION-LOG.md.
 > Honest status vocabulary: `NOT STARTED` · `IN PROGRESS` · `CODE WRITTEN (untested)` · `TESTED` (tests actually executed and passing, with counts in TEST-REPORT.md) · `DEFERRED`.
 
-Last updated: 2026-11-10 (session 2, checkpoint 6)
+Last updated: 2026-11-10 (session 2, checkpoint 7)
 
 ## Release map
 
@@ -29,16 +29,17 @@ Last updated: 2026-11-10 (session 2, checkpoint 6)
 | 6 | Attendance API: sheet, bulk save (all-or-nothing), corrections + approval, history, monthly + low-attendance reports | **TESTED** (API) |
 | 6e | E2E: attendance submission + mobile workflows | **TESTED** (14/14) |
 | 7a | Encrypted backups + retention, restore, restore drill, per-school export/purge/restore (CLI), rehearsal script, runbook (docs/build/BACKUP-RESTORE.md) | **TESTED** (6 tests + real-CLI rehearsal PASS); production-host drill NOT DONE (no hosting) |
-| 7b | Deployment docs (ADR-2 proxy), performance test, security review pass | NOT STARTED |
+| 7b | Deployment kit (Caddy, systemd, env templates, DEPLOYMENT.md), production startup guards, bundled CLI, performance test (all targets met), security review pass 1 (SECURITY-REPORT.md) | **TESTED** locally (perf PASS, prod bundles smoke-tested, 142 API + 26 E2E); real host NOT DONE |
 | Web | R1 screens: auth, grouped role-filtered nav, dashboard, attendance (+ correction requests), attendance reports (CSV), corrections queue, students list (filters/export), add student, student profile (edit/status/guardians/attendance), import wizard, staff, academic sessions, classes/sections/subjects/teacher assignments, holidays, users & roles, school settings/policies, audit log. Production build passes. | **TESTED** (E2E 26/26, desktop + 360 px) |
 
 ## NEXT ACTION
-1. R1 remaining: (a) ~~web screens~~ done at checkpoint 5 (still missing, lower priority: own profile/password/sessions page, onboarding checklist); (b) ~~CSV import/export~~ done; (c) ~~backups/tenant tools~~ done at checkpoint 6; (d) deployment docs (ADR-2 reverse proxy), performance test with realistic dataset, security review pass; (e) `docs/build` remaining files (ARCHITECTURE, SETUP, ENVIRONMENT, DEPLOYMENT, SECURITY-REPORT, MASTER-IMPLEMENTATION-PLAN, traceability matrix).
+1. R1 remaining: (a) ~~web screens~~ done at checkpoint 5 (still missing, lower priority: own profile/password/sessions page, onboarding checklist); (b) ~~CSV import/export~~ done; (c) ~~backups/tenant tools~~ done at checkpoint 6; (d) ~~deployment docs, perf test, security review~~ done at checkpoint 7 (real-host steps need hosting); (e) `docs/build` remaining files (ARCHITECTURE, SETUP, ENVIRONMENT, DEPLOYMENT, SECURITY-REPORT, MASTER-IMPLEMENTATION-PLAN, traceability matrix).
 2. R2 Fees & ledger (start with the pdfmake Hindi rendering spike, ADR-6). R3 (re-evaluate job queue first, ADR-5), R4, R5.
 3. Never mark a release done without its acceptance tests (docs/phase-0/11).
 
 ## Housekeeping for the user
-- A first rehearsal run hung (harness bug, fixed). Its processes could not be stopped from the session: node PIDs 13712, 31380, 27784, 17052, 7280 and mongod PID 25372 (temp dir `mongo-mem-OqV8qr`). Safe to end them in Task Manager.
+- Processes started by the agent that it was not permitted to force-stop: the `npx`-spawned dev web (:3000) and dev API (IPv6 :4000) from the checkpoint-7 run, plus the dev MongoDB (`.data/mongo-dev`). End them in Task Manager when done.
+- `apps/api/.data/mongo` is an unusable data folder from a failed dev-db start (contains nothing of value) — delete it, or keep using `DEV_DB_PATH`.
 
 ## Recovery points (git)
 See `git log` in the repository root (local repository, no remote configured).

@@ -113,7 +113,13 @@ describe('env validation (fail fast)', () => {
   it('refuses insecure production configuration', () => {
     expect(() => loadEnv({ NODE_ENV: 'production', COOKIE_SECURE: 'false', DATABASE_URL: 'mongodb+srv://x' } as NodeJS.ProcessEnv)).toThrow(/COOKIE_SECURE/);
     expect(() => loadEnv({ NODE_ENV: 'production', COOKIE_SECURE: 'true', DATABASE_URL: 'mongodb://localhost/x' } as NodeJS.ProcessEnv)).toThrow(/localhost/);
-    expect(() => loadEnv({ NODE_ENV: 'production', COOKIE_SECURE: 'true', DATABASE_URL: 'mongodb+srv://x', FEATURE_ONLINE_PAYMENTS: 'true' } as NodeJS.ProcessEnv)).toThrow(/Paid/);
+    const prod = { NODE_ENV: 'production', COOKIE_SECURE: 'true', DATABASE_URL: 'mongodb+srv://x', APP_BASE_URL: 'https://app.example.test', ALLOWED_ORIGINS: 'https://app.example.test', TRUST_PROXY_HOPS: '1' };
+    expect(() => loadEnv({ ...prod, FEATURE_ONLINE_PAYMENTS: 'true' } as NodeJS.ProcessEnv)).toThrow(/Paid/);
+    expect(() => loadEnv({ ...prod, APP_BASE_URL: 'http://app.example.test' } as NodeJS.ProcessEnv)).toThrow(/APP_BASE_URL/);
+    expect(() => loadEnv({ ...prod, ALLOWED_ORIGINS: 'https://a.test,http://b.test' } as NodeJS.ProcessEnv)).toThrow(/ALLOWED_ORIGINS/);
+    expect(() => loadEnv({ ...prod, TRUST_PROXY_HOPS: '0' } as NodeJS.ProcessEnv)).toThrow(/TRUST_PROXY_HOPS/);
+    const ok = loadEnv(prod as NodeJS.ProcessEnv);
+    expect(ok.HOST).toBe('127.0.0.1'); // only the reverse proxy can reach the API
   });
   it('rejects invalid values and keeps paid integrations off by default', () => {
     expect(() => loadEnv({ PORT: 'abc' } as NodeJS.ProcessEnv)).toThrow(/PORT/);

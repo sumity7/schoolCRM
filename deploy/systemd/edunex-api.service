@@ -1,0 +1,27 @@
+[Unit]
+Description=EduNex API (Express)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=edunex
+Group=edunex
+WorkingDirectory=/opt/edunex/current/apps/api
+EnvironmentFile=/etc/edunex/api.env
+ExecStart=/usr/bin/node dist/server.js
+Restart=on-failure
+RestartSec=5
+# Hardening: the API needs only its own files, the network and /var/lib/edunex.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/edunex
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target

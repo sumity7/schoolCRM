@@ -33,8 +33,14 @@ export function summariseAttendance(statuses: AttendanceStatusValue[], policy: A
     else if (s === 'half_day') c.halfDay++;
     else c.excused++;
   }
+  return summariseCounts(c, policy);
+}
+
+/** Same rule from per-status COUNTS (used when the database does the counting, e.g. whole-school reports). */
+export function summariseCounts(c: { present: number; absent: number; late: number; halfDay: number; excused: number }, policy: AttendancePolicy): AttendanceSummary {
+  const markedDays = c.present + c.absent + c.late + c.halfDay + c.excused;
   const presentUnits = c.present + (policy.lateCountsAsPresent ? c.late : 0) + c.halfDay * policy.halfDayWeight;
-  const denom = statuses.length - c.excused;
+  const denom = markedDays - c.excused;
   const percentage = denom > 0 ? Math.round((presentUnits / denom) * 10000 + Number.EPSILON) / 100 : null;
-  return { markedDays: statuses.length, ...c, presentUnits, percentage };
+  return { markedDays, present: c.present, absent: c.absent, late: c.late, halfDay: c.halfDay, excused: c.excused, presentUnits, percentage };
 }

@@ -12,6 +12,8 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   APP_ENV_LABEL: z.string().default('DEV'), // shown in UI banner: DEV | STAGING | (empty for prod)
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+  /** Interface to bind. Loopback by default: in production only the reverse proxy may reach the API (ADR-2). */
+  HOST: z.string().default('127.0.0.1'),
   DATABASE_URL: z.string().min(1).default('mongodb://127.0.0.1:27017/edunex_dev?replicaSet=rs0'),
   /** Origins allowed to make state-changing requests (CSRF Origin check). */
   ALLOWED_ORIGINS: z
@@ -51,6 +53,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     if (env.DATABASE_URL.includes('127.0.0.1') || env.DATABASE_URL.includes('localhost')) {
       throw new Error('DATABASE_URL points at localhost in production');
     }
+    if (!env.APP_BASE_URL.startsWith('https://')) throw new Error('APP_BASE_URL must be https:// in production');
+    if (env.ALLOWED_ORIGINS.some((o) => !o.startsWith('https://'))) throw new Error('ALLOWED_ORIGINS must all be https:// in production');
+    if (env.TRUST_PROXY_HOPS < 1) throw new Error('TRUST_PROXY_HOPS must be ≥ 1 in production (the API runs behind the reverse proxy)');
     if (env.FEATURE_ONLINE_PAYMENTS || env.FEATURE_SMS || env.FEATURE_WHATSAPP) {
       // Allowed only after explicit authorisation; kept as a hard stop until D-28/D-11 are lifted.
       throw new Error('Paid/unauthorised integration flags must remain false until explicitly approved');

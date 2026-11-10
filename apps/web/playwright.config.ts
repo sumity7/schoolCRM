@@ -31,7 +31,7 @@ export default defineConfig({
       url: `${WEB}/login`,
       timeout: 180_000,
       reuseExistingServer: false,
-      env: { API_ORIGIN: 'http://localhost:4100' },
+      env: { API_ORIGIN: 'http://127.0.0.1:4100' },
     },
     { command: 'node e2e/attacker-server.mjs', url: 'http://localhost:3200/', timeout: 30_000, reuseExistingServer: false, env: { E2E_WEB_ORIGIN: WEB } },
   ],

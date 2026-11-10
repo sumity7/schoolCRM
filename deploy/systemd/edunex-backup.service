@@ -1,0 +1,14 @@
+[Unit]
+Description=EduNex nightly encrypted backup + retention + off-site copy
+
+[Service]
+Type=oneshot
+User=edunex
+Group=edunex
+WorkingDirectory=/opt/edunex/current/apps/api
+# api.env provides DATABASE_URL; backup.env provides BACKUP_PASSPHRASE and the rclone remote (chmod 600, owned by root).
+EnvironmentFile=/etc/edunex/api.env
+EnvironmentFile=/etc/edunex/backup.env
+ExecStart=/usr/bin/node dist/cli.js backup --dir /var/backups/edunex --prune
+# Off-site copy to a DIFFERENT provider (configure rclone first; doc 12 §7). Same retention is applied there by sync.
+ExecStartPost=/usr/bin/rclone sync /var/backups/edunex ${BACKUP_REMOTE}

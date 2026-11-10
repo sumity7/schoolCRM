@@ -25,6 +25,11 @@ npm run cli --workspace @edunex/api -- create-school --code demo --name "Demo Sc
 The owner invitation link is printed and also written to `apps/api/.data/mail/` (dev outbox — no real email is sent).
 Use **synthetic data only**; never load real student data into a development machine.
 
+### Notes
+- `npm run seed:demo` creates a synthetic school: `owner@demo.test` / `tina@demo.test`, password `Correct-Horse-9`.
+- Set `DEV_DB_PATH` to put the dev database somewhere else (e.g. if `apps/api/.data/mongo` was left broken by an interrupted first start).
+- Set `MONGOMS_SYSTEM_BINARY` to reuse an installed `mongod` instead of downloading one.
+
 ## Tests
 ```
 # optional (PowerShell): reuse an installed mongod instead of downloading one

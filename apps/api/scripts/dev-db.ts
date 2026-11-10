@@ -7,7 +7,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 
-const dbPath = join(process.cwd(), '.data', 'mongo');
+const dbPath = process.env.DEV_DB_PATH ?? join(process.cwd(), '.data', 'mongo');
 mkdirSync(dbPath, { recursive: true });
 
 const rs = await MongoMemoryReplSet.create({
