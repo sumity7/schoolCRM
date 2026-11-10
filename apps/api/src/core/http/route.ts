@@ -41,6 +41,8 @@ export interface RouteSpec<TN extends Tenancy, P extends ZodTypeAny, Q extends Z
   permission?: PermissionKey;
   /** School route open to any active member of the school (e.g. own-school profile). */
   anyMember?: boolean;
+  /** Extra permissions that must ALSO be held (any scope), e.g. finance routes additionally need `financial:view`. */
+  alsoRequire?: PermissionKey[];
   /** Platform routes: allowed platform roles (default super_admin). */
   platformRoles?: Array<'super_admin' | 'support'>;
   entitlement?: string;
@@ -65,6 +67,7 @@ export interface ManifestEntry {
   auth: 'public' | 'session';
   permission?: PermissionKey;
   anyMember?: boolean;
+  alsoRequire?: PermissionKey[];
   platformRoles?: string[];
   entitlement?: string;
   rateClass: RateClass;
@@ -118,7 +121,7 @@ export function createRegistrar(deps: RegistrarDeps): Registrar {
       if (spec.tenancy === 'school' && !spec.permission && !spec.anyMember) {
         throw new Error(`Route ${spec.method.toUpperCase()} ${spec.path}: school routes must declare a permission or anyMember`);
       }
-      if (spec.tenancy !== 'school' && (spec.permission || spec.anyMember)) {
+      if (spec.tenancy !== 'school' && (spec.permission || spec.anyMember || spec.alsoRequire)) {
         throw new Error(`Route ${spec.method.toUpperCase()} ${spec.path}: permission only applies to school routes`);
       }
       if (spec.tenancy !== 'none' && spec.auth === 'public') {
@@ -140,6 +143,7 @@ export function createRegistrar(deps: RegistrarDeps): Registrar {
         auth: spec.auth,
         permission: spec.permission,
         anyMember: spec.anyMember,
+        alsoRequire: spec.alsoRequire,
         platformRoles: spec.tenancy === 'platform' ? (spec.platformRoles ?? ['super_admin']) : undefined,
         entitlement: spec.entitlement,
         rateClass,
@@ -173,6 +177,7 @@ export function createRegistrar(deps: RegistrarDeps): Registrar {
               scope = tenant.grants.get(spec.permission);
               if (!scope) throw forbidden();
             }
+            for (const extra of spec.alsoRequire ?? []) if (!tenant.grants.get(extra)) throw forbidden();
             if (spec.entitlement && deps.entitlementGate) await deps.entitlementGate(spec.entitlement, tenant);
           }
 

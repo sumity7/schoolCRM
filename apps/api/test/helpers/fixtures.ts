@@ -74,3 +74,25 @@ export async function buildSchoolData(app: Express, code: string, opts: { studen
 }
 
 export const todayIst = () => todayInTz('Asia/Kolkata');
+
+export interface FeeData { categoryId: string; structureId: string; invoiceId: string; paymentId: string; requestId: string; concessionId: string }
+
+/** Fee setup through the real API: tuition head, published structure (Q1 overdue, Q2 future), Q1 billed to section A,
+ * one ₹1,000 cash payment, a pending reversal request and an approved concession. */
+export async function buildFeeData(sd: SchoolData, key = 'fx'): Promise<FeeData> {
+  const o = sd.owner;
+  const { addDays } = await import('@edunex/shared');
+  const today = todayIst();
+  const cat = must(await o.post('/fees/categories', { key: 'tuition', name: 'Tuition Fee', kind: 'tuition' }), 201, 'fee category');
+  const st = must(await o.post('/fees/structures', {
+    sessionId: sd.sessionId, classId: sd.classId, name: 'Standard',
+    items: [{ categoryId: cat.body.data.id, installments: [{ label: 'Q1', dueDate: addDays(today, -10), amountPaise: 300_000 }, { label: 'Q2', dueDate: addDays(today, 80), amountPaise: 300_000 }] }],
+  }), 201, 'structure');
+  must(await o.post(`/fees/structures/${st.body.data.id}/publish`), 200, 'publish');
+  must(await o.post('/fees/invoices/generate', { structureId: st.body.data.id, installmentLabel: 'Q1', sectionId: sd.sectionA }, { 'Idempotency-Key': `${key}-gen-q1` }), 200, 'generate');
+  const inv = must(await o.get(`/fees/invoices?studentId=${sd.studentsA[0]}`), 200, 'invoices');
+  const pay = must(await o.post('/fees/payments', { studentId: sd.studentsA[0], amountPaise: 100_000, mode: 'cash', paidOn: today }, { 'Idempotency-Key': `${key}-pay-1` }), 201, 'payment');
+  const req = must(await o.post(`/fees/payments/${pay.body.data.payment.id}/reversal-requests`, { reason: 'fixture request' }), 201, 'reversal request');
+  const con = must(await o.post('/fees/concessions', { studentId: sd.studentsA[1], kind: 'sibling', valueType: 'flat', value: 10_000, reason: 'fixture sibling' }), 201, 'concession');
+  return { categoryId: cat.body.data.id, structureId: st.body.data.id, invoiceId: inv.body.data[0].id, paymentId: pay.body.data.payment.id, requestId: req.body.data.id, concessionId: con.body.data.id };
+}

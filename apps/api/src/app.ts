@@ -18,6 +18,7 @@ import { registerStaffRoutes } from './modules/staff/staff.routes';
 import { registerStudentRoutes } from './modules/students/students.routes';
 import { registerAttendanceRoutes } from './modules/attendance/attendance.routes';
 import { registerImportRoutes } from './modules/imports/imports.routes';
+import { registerFeeRoutes } from './modules/fees/fees.routes';
 
 export interface AppDeps {
   env: Env;
@@ -83,6 +84,7 @@ export function createApp(deps: AppDeps): BuiltApp {
   registerStudentRoutes(registrar);
   registerAttendanceRoutes(registrar);
   registerImportRoutes(registrar);
+  registerFeeRoutes(registrar);
 
   app.use(API_BASE, router);
   app.use(notFoundHandler());

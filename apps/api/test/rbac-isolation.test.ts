@@ -5,7 +5,7 @@ import { Client, loggedIn, makeTestApp, seedMember, seedSchool, type SeededSchoo
 import { _auditRowsForTest } from '../src/core/audit/audit.service';
 import { memberships, sessions } from '../src/modules/auth/auth.repository';
 import mongoose, { Types } from 'mongoose';
-import { buildSchoolData, todayIst, type SchoolData } from './helpers/fixtures';
+import { buildFeeData, buildSchoolData, todayIst, type SchoolData } from './helpers/fixtures';
 import { modelRegistry } from '../src/core/tenancy/registry';
 import { runAsPlatform } from '../src/core/tenancy/context';
 import { AttendanceCorrectionModel } from '../src/modules/attendance/attendance.model';
@@ -83,6 +83,13 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
     'patch /users/:membershipId': { body: { status: 'suspended' } },
     'get /imports/:id': {}, 'put /imports/:id/mapping': { body: { mapping: { admissionNo: 0 } } }, 'post /imports/:id/validate': { body: {} },
     'post /imports/:id/commit': { body: {} }, 'post /imports/:id/rollback': { body: {} }, 'get /imports/:id/errors.csv': {},
+    'patch /fees/categories/:id': { body: { name: 'Hack' } }, 'get /fees/structures/:id': {}, 'patch /fees/structures/:id': { body: { name: 'Hack' } },
+    'delete /fees/structures/:id': {}, 'post /fees/structures/:id/publish': { body: {} }, 'post /fees/structures/:id/revise': { body: {} },
+    'post /fees/concessions/:id/approve': { body: {} }, 'post /fees/concessions/:id/reject': { body: {} }, 'post /fees/concessions/:id/revoke': { body: { reason: 'hack attempt' } },
+    'get /fees/invoices/:id': {}, 'post /fees/invoices/:id/void': { body: { reason: 'hack attempt' } }, 'post /fees/invoices/:id/late-fee': { body: { amountPaise: 100, reason: 'hack attempt' } },
+    'post /fees/invoices/:id/adjust': { body: { amountPaise: -100, reason: 'hack attempt' } }, 'get /fees/students/:id/summary': {},
+    'get /fees/payments/:id': {}, 'get /fees/payments/:id/receipt.pdf': {}, 'post /fees/payments/:id/reversal-requests': { body: { reason: 'hack attempt' } },
+    'post /fees/requests/:id/approve': { body: {} }, 'post /fees/requests/:id/reject': { body: {} }, 'post /fees/requests/:id/mark-paid': { body: { paidOn: todayIst(), mode: 'cash' } },
   });
 
   const snapshotSchool = async (schoolId: Types.ObjectId) => {
@@ -101,12 +108,14 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
       AttendanceCorrectionModel.create({ schoolId: HB.school.schoolId, studentId: new Types.ObjectId(HB.studentsA[0]), sectionId: new Types.ObjectId(HB.sectionA), date: '2026-01-05', to: 'present', reason: 'fixture', requestedBy: new Types.ObjectId(), status: 'pending' }));
     const bImport = await HB.owner.post('/imports', { entity: 'students', filename: 'b.csv', csv: 'Admission No,Student Name,DOB\nB-9,Secret Kid,01/01/2015' });
     if (bImport.status !== 201) throw new Error(`fixture import: ${bImport.status}`);
+    const bFees = await buildFeeData(HB, 'harnb');
     const fx: Record<string, string> = {
       import: bImport.body.data.id,
+      fee_category: bFees.categoryId, fee_structure: bFees.structureId, concession: bFees.concessionId, invoice: bFees.invoiceId, payment: bFees.paymentId, finance_request: bFees.requestId,
       session: HB.sessionId, class: HB.classId, section: HB.sectionA, subject: HB.subjectId, assignment: HB.assignmentId, event: HB.eventId,
       staff: HB.teacherStaffId, student: HB.studentsA[0]!, guardian_link: HB.guardianLinkId, correction: String(bCorrection._id), membership: String(HB.teacherMembershipId),
     };
-    return { HA, HB, fx };
+    return { HA, HB, fx, bFees };
   }
 
   it("every id-bearing route returns 404 for School B ids, and School B's data is byte-for-byte unchanged", async () => {
@@ -132,10 +141,12 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
 
   it("every collection route returns only the caller's own rows (no School B id appears anywhere)", async () => {
     const { HA, HB, fx } = await twoSchools();
-    const bIds = ['Secret Kid', fx.import!, HB.sessionId, HB.classId, HB.sectionA, HB.sectionB, HB.subjectId, HB.teacherStaffId, HB.assignmentId, HB.eventId, HB.guardianLinkId, ...HB.studentsA, ...HB.studentsB, String(HB.school.schoolId), String(HB.teacherMembershipId)];
+    const bIds = ['Secret Kid', fx.import!, fx.invoice!, fx.payment!, fx.fee_structure!, HB.sessionId, HB.classId, HB.sectionA, HB.sectionB, HB.subjectId, HB.teacherStaffId, HB.assignmentId, HB.eventId, HB.guardianLinkId, ...HB.studentsA, ...HB.studentsB, String(HB.school.schoolId), String(HB.teacherMembershipId)];
     const routes = registrar.manifest.filter((m) => m.method === 'get' && m.tenancy === 'school' && !m.path.includes(':'));
     const month = `?sectionId=${HA.sectionA}&month=${todayIst().slice(0, 7)}`;
-    const queries: Record<string, string> = { '/attendance/reports/monthly': month, '/attendance/reports/monthly.csv': month };
+    const range = `?from=2020-01-01&to=${todayIst()}`;
+    const queries: Record<string, string> = { '/attendance/reports/monthly': month, '/attendance/reports/monthly.csv': month, '/fees/reports/collection': range, '/fees/reports/collection.csv': range };
+    await buildFeeData(HA, 'harna2');
     let checked = 0;
     for (const m of routes) {
       const p = m.path.replace('/api/v1', '');
@@ -148,6 +159,22 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
     }
     expect(checked).toBeGreaterThan(10);
     expect((await HA.owner.get('/students')).body.meta.total).toBe(6);
+  });
+
+  it("finance: School B ids inside request BODIES are refused (payments, refunds, billing, concessions) and B's money is untouched", async () => {
+    const { HA, HB, bFees } = await twoSchools();
+    await buildFeeData(HA, 'harna');
+    const before = await snapshotSchool(HB.school.schoolId);
+    const k = (n: string) => ({ 'Idempotency-Key': `attack-${n}-${Date.now()}` });
+    expect((await HA.owner.post('/fees/payments', { studentId: HB.studentsA[0], amountPaise: 100, mode: 'cash', paidOn: todayIst() }, k('pay'))).status).toBe(404);
+    expect((await HA.owner.post('/fees/refunds', { studentId: HB.studentsA[0], amountPaise: 100, reason: 'attack' })).status).toBe(404);
+    expect((await HA.owner.post('/fees/invoices/generate', { structureId: bFees.structureId, installmentLabel: 'Q1' }, k('gen'))).status).toBe(404);
+    expect((await HA.owner.post('/fees/concessions', { studentId: HB.studentsA[0], kind: 'other', valueType: 'flat', value: 100, reason: 'attack' })).status).toBe(404);
+    const myInvoices = (await HA.owner.get(`/fees/invoices?studentId=${HA.studentsA[0]}`)).body.data as Array<{ id: string }>;
+    const res = await HA.owner.post('/fees/payments', { studentId: HA.studentsA[0], amountPaise: 100, mode: 'cash', paidOn: todayIst(), allocations: [{ invoiceId: bFees.invoiceId, amountPaise: 100 }] }, k('alloc'));
+    expect(res.status).toBe(404); // allocating to another school's invoice
+    expect(myInvoices.length).toBeGreaterThan(0);
+    expect(await snapshotSchool(HB.school.schoolId)).toBe(before);
   });
 
   it('payload schoolId is rejected (strict schemas), never trusted', async () => {
