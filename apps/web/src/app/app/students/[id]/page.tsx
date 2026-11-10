@@ -11,6 +11,7 @@ import { sectionLabel, sortSections, useSections } from '@/lib/lookups';
 import { GENDERS, genderLabel, statusTone, type GuardianLink, type StudentDetail } from '@/lib/students';
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Skeleton, Table, Td, Th } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/modal';
+import { inr, type StudentFeeSummary } from '@/lib/fees';
 
 const todayInIndia = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 const daysAgo = (n: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(Date.now() - n * 86_400_000));
@@ -117,6 +118,8 @@ export default function StudentDetailPage() {
           </Card>
         ) : null}
       </div>
+
+      {can('invoices:read') && can('financial:view') ? <FeesCard studentId={s.id} /> : null}
 
       {can('guardians:read') ? (
         <section className="space-y-2">
@@ -252,5 +255,28 @@ function GuardianModal({ open, onOpenChange, studentId, onSaved }: { open: boole
         <Button type="submit" disabled={m.isPending}>{m.isPending ? 'Saving…' : 'Add guardian'}</Button>
       </form>
     </Modal>
+  );
+}
+
+function FeesCard({ studentId }: { studentId: string }) {
+  const { me, can } = useAuth();
+  const q = useQuery({ queryKey: ['fee-summary', me?.activeMembershipId, studentId], queryFn: async () => (await get<StudentFeeSummary>(`/fees/students/${studentId}/summary`)).data });
+  if (q.isLoading) return <Skeleton className="h-24" />;
+  if (q.error || !q.data) return null;
+  const t = q.data.totals;
+  return (
+    <Card className="p-4" data-testid="student-fees">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-medium">Fees</h2>
+        {can('payments:create') ? <Link href={`/app/fees/collect?studentId=${studentId}`} className="inline-flex min-h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">Collect fee</Link> : null}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+        <div><p className="text-xs text-muted-foreground">Billed</p><p className="font-semibold">{inr(t.billedPaise)}</p></div>
+        <div><p className="text-xs text-muted-foreground">Paid</p><p className="font-semibold">{inr(t.paidPaise)}</p></div>
+        <div><p className="text-xs text-muted-foreground">Balance</p><p className="font-semibold">{inr(t.balancePaise)}</p></div>
+        <div><p className="text-xs text-muted-foreground">Overdue</p><p className={`font-semibold ${t.overduePaise ? 'text-danger' : ''}`}>{inr(t.overduePaise)}</p></div>
+        <div><p className="text-xs text-muted-foreground">Advance</p><p className="font-semibold">{inr(t.advanceCreditPaise)}</p></div>
+      </div>
+    </Card>
   );
 }

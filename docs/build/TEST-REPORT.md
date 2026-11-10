@@ -10,7 +10,7 @@ npx vitest run
 Tests use one in-memory MongoDB **replica set** (real transactions) with one database per test file. Synthetic data only.
 Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8.3.4 (local), Vitest 3.2.7.
 
-## Latest run — checkpoint 7 (2026-11-10, session 2)
+## Latest run — checkpoint 8 (2026-11-10, session 2)
 
 | Suite | File | Tests | Result |
 |---|---|---|---|
@@ -18,16 +18,17 @@ Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8
 | Kernel: sequences, idempotency, audit redaction, rate limit, env validation | `src/core/kernel.test.ts` | 12 | **12 passed** |
 | Shared package: identifiers, calendar days, permission catalogue/roles | `src/shared.test.ts` | 8 | **8 passed** |
 | Auth, sessions, CSRF, reset/invite, tenant switching, hygiene | `test/auth.test.ts` | 29 | **29 passed** |
-| Route manifest, isolation harness v2 (all id-routes — now incl. the 6 import routes — attacked with School B ids + byte-for-byte snapshot; collection-route leak sweep incl. CSV bodies), RBAC/escalation, audit | `test/rbac-isolation.test.ts` | 18 | **18 passed** |
+| Route manifest, isolation harness v2 (all id-routes — incl. import and 23 fee routes — attacked with School B ids + byte-for-byte snapshot; School B ids inside finance request bodies; collection-route leak sweep incl. CSV bodies), RBAC/escalation, audit | `test/rbac-isolation.test.ts` | 19 | **19 passed** |
 | R1 domain: academics, students, guardians, attendance (scope, dates, corrections, percentages, concurrency) | `test/r1-domain.test.ts` | 25 | **25 passed** |
 | Lint canaries (the architecture rules actually fire) | `test/lint-rules.test.ts` | 4 | **4 passed** |
 | Import/export: CSV parser + formula-injection sanitiser, date parsing, mapping; 1,000-row/30-bad acceptance, re-import duplicates, class/section/roll/capacity/plan-limit validation, sibling guardian reuse, idempotent commit, rollback of untouched rows only, transaction-join proof, RBAC; student + attendance CSV exports (audited, re-importable) | `test/imports.test.ts` | 17 | **17 passed** |
 | Backups & tenant portability: encrypted archive round trip with digest verification, wrong passphrase / tampering / truncation write nothing, short passphrase refused, existing file never overwritten, restore drill, GFS retention, export → purge (guards, other school byte-identical, sessions die) → restore → password reset | `test/backup.test.ts` | 6 | **6 passed** |
-| **Total** | 9 files | **142** | **142 passed, 0 failed, 0 skipped** |
+| Fees (R2): money arithmetic + allocation property test; structures/versions; idempotent billing; concessions & limits; payments/advance/receipt numbering; 30-way concurrency; receipt PDF; reversals/refunds/separation of duties; day close; ledger invariant property test over random operations; reports | `test/fees.test.ts` | 18 | **18 passed** |
+| **Total** | 10 files | **161** | **161 passed, 0 failed, 0 skipped** |
 
 Static checks at the same commit: `tsc --noEmit` (strict) clean; `eslint apps packages --max-warnings 0` clean.
 
-## Browser E2E (Playwright) — checkpoint 5
+## Browser E2E (Playwright) — checkpoint 8
 
 Run: `cd apps/web && $env:MONGOMS_SYSTEM_BINARY="<mongod path>"; $env:PW_CHANNEL="msedge"; npx playwright test`
 (`PW_CHANNEL` drives an installed browser; without it Playwright's own Chromium must be installed.) The run starts an isolated in-memory
@@ -44,7 +45,10 @@ MongoDB replica set + the real API (`apps/api/scripts/e2e-server.ts`, synthetic 
 | E2E-06 | Import wizard: upload CSV → columns auto-matched → check → problem row shown with reason → import 2 → students searchable → undo removes them; teacher has no Imports link and the API answers 403 | pass | pass |
 | E2E-07 | Add student → add guardian → portal blocked until verified → verify → enable portal → edit twice (no stale-version error) → export CSV download (BOM, re-importable headers) | pass | pass |
 | E2E-08 | Every one of the 13 owner sidebar screens loads with no error alert and no horizontal scroll; teacher sees no setup/admin links; owner creates class + section (capacity shown) and a holiday | pass | pass |
-| **Total** | 13 specs × 2 projects | **26 passed, 0 failed** | |
+| E2E-09 | Fee desk: bill an instalment from the Invoices screen → collect a part-payment (confirmation shows allocation) → receipt number format → receipt PDF bytes via the proxy → balance drops by exactly the amount → reversal request; requester gets no Approve button; teachers see no fee screens and the API answers 403 | pass | pass |
+| **Total** | 15 specs × 2 projects | **30 passed** | |
+
+Checkpoint-8 full run: 28/30 passed; the 2 failures were the screen-sweep test (now 20 screens) exceeding its 60 s budget while the dev server compiled routes. Its budget was raised and it was re-run: 2/2 passed. The other 28 were not re-run after that change.
 
 Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a real phone have not been run; the Next.js *development* server was used (production-topology proxy of ADR-2 not yet exercised); Screen coverage is functional, not visual; accessibility has not been audited with a screen reader.
 
@@ -112,6 +116,10 @@ Limits: tiny synthetic dataset on a local machine; not yet run on a production h
 14. (prod build) Next standalone bundle traced files from the wrong root (a stray lockfile in the user folder) → `outputFileTracingRoot` set.
 15. (prod build) `localhost` vs `127.0.0.1` rewrite target (IPv6 resolution) → explicit IPv4.
 16. (run) `scripts/dev-db.ts` left an unusable data folder after a failed first start → `DEV_DB_PATH` override added; the broken folder `apps/api/.data/mongo` is left for the user to delete.
+
+17. (fees, test-side) `-0 ≠ 0` in the invariant helper; too-short platform-read reason; ambiguous labels in E2E — fixed in the tests.
+18. (fees) ESLint caught a misleading Unicode character class in the script-run splitter → replaced with explicit code-point ranges.
+19. (fees E2E) Playwright returns an empty body for a response the page consumed as a blob — the test re-requests the same URL through the same proxy and checks the PDF bytes.
 
 ## Not yet covered (tracked in PROGRESS.md)
 - E2E on WebKit/Firefox and real devices; E2E against the production-style reverse-proxy topology.

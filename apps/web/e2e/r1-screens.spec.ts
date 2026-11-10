@@ -128,16 +128,18 @@ test.describe('E2E-07 student record screens', () => {
 });
 
 test.describe('E2E-08 setup screens & navigation', () => {
-  test('owner: every sidebar screen loads without errors or horizontal scroll', async ({ page }) => {
+  test('owner: every sidebar screen (incl. 7 fee screens) loads without errors or horizontal scroll', async ({ page }) => {
+    test.setTimeout(300_000); // 20 screens; the dev server compiles each route on first visit
     await login(page, 'owner@alpha.test');
     const hrefs = ['/app', '/app/attendance', '/app/attendance/reports', '/app/attendance/corrections', '/app/students', '/app/imports', '/app/staff',
-      '/app/settings/academic-sessions', '/app/settings/classes', '/app/settings/calendar', '/app/settings/users', '/app/settings/school', '/app/audit'];
+      '/app/settings/academic-sessions', '/app/settings/classes', '/app/settings/calendar', '/app/settings/users', '/app/settings/school', '/app/audit',
+      '/app/fees/collect', '/app/fees/invoices', '/app/fees/payments', '/app/fees/concessions', '/app/fees/approvals', '/app/fees/reports', '/app/fees/setup'];
     const burger = page.getByRole('button', { name: 'Open menu' });
     if (await burger.isVisible()) await burger.click();
     for (const h of hrefs) await expect(page.locator(`nav a[href="${h}"]`).first(), `nav link ${h}`).toBeAttached();
     for (const h of hrefs) {
       await page.goto(h);
-      await expect(page.getByRole('heading', { level: 1 }).first(), h).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1 }).first(), h).toBeVisible({ timeout: 45_000 });
       await page.waitForLoadState('networkidle');
       await expect(page.locator('main [role="alert"]'), `${h} shows an error`).toHaveCount(0);
       expect(await noHorizontalScroll(page), `${h} scrolls horizontally`).toBe(true);

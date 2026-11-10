@@ -34,5 +34,13 @@ The system is **not safe for live school data**. The Production-Readiness Gate (
 - CSP still allows inline scripts (no nonces yet). Import batches retain raw uploaded rows until a retention rule is decided.
 - The deployment kit (Caddy, systemd, rclone) is written but has never run on a Linux host; performance numbers come from one local machine.
 
+## Fees (R2, checkpoint 8)
+- **Not yet trusted with real money**: Gate G8 (30-day cash/ledger parallel run against the school's current receipt book) has not happened.
+- No online payments (gateway work is behind a disabled flag — D-28). No automatic late fees (D-08 default: manual with reason).
+- No fee carry-forward or fee-structure copy at session rollover yet (comes with R5 promotion). No cheque-clearing workflow (a bounced cheque is a reversal).
+- Receipt PDFs: copying Devanagari text out of the PDF gives scrambled text (printing/viewing is correct).
+- Collection/outstanding are the only fee reports; class-wise/category-wise/discount reports are not built.
+- Fee policy defaults (D-06…D-09) were chosen by the build agent from doc 14's proposals; schools can change prefix, concession limits and advance handling at Fee setup → Policy.
+
 ## Environment
 - Tests use `mongodb-memory-server` (downloads ~590 MB of `mongod` on first run). Pinned `MONGOMS_VERSION` must match the production MongoDB major version once hosting is chosen.

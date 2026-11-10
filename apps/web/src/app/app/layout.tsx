@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BarChart3, Building2, CalendarCheck, CalendarDays, ClipboardCheck, GraduationCap, History, Layers, LayoutDashboard, LogOut, Menu, Moon, Sun, Upload, UserCog, Users, X } from 'lucide-react';
+import { BadgeCheck, BarChart3, Building2, Coins, FileText, Percent, Receipt, Wallet, Wrench, CalendarCheck, CalendarDays, ClipboardCheck, GraduationCap, History, Layers, LayoutDashboard, LogOut, Menu, Moon, Sun, Upload, UserCog, Users, X } from 'lucide-react';
 import type { PermissionKey, Scope } from '@edunex/shared';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,8 @@ interface NavItem {
   perm?: PermissionKey;
   /** Require at least school-wide scope (hides admin screens from teachers who hold the key only for their own records). */
   schoolScope?: boolean;
+  /** Additional permission (finance screens also need financial:view). */
+  also?: PermissionKey;
 }
 
 /** Navigation is filtered by permissions for UX only; the API enforces everything. Only built screens appear (no dead links). */
@@ -29,6 +31,18 @@ const NAV: Array<{ group?: string; items: NavItem[] }> = [
       { href: '/app/students', label: 'Students', icon: GraduationCap, perm: 'students:read' },
       { href: '/app/imports', label: 'Imports', icon: Upload, perm: 'imports:create' },
       { href: '/app/staff', label: 'Staff', icon: Users, perm: 'staff:read', schoolScope: true },
+    ],
+  },
+  {
+    group: 'Fees',
+    items: [
+      { href: '/app/fees/collect', label: 'Collect fee', icon: Wallet, perm: 'payments:create', also: 'financial:view' },
+      { href: '/app/fees/invoices', label: 'Invoices', icon: FileText, perm: 'invoices:read', also: 'financial:view' },
+      { href: '/app/fees/payments', label: 'Payments', icon: Receipt, perm: 'payments:read', also: 'financial:view' },
+      { href: '/app/fees/concessions', label: 'Concessions', icon: Percent, perm: 'discounts:apply', also: 'financial:view' },
+      { href: '/app/fees/approvals', label: 'Approvals', icon: BadgeCheck, perm: 'refunds:request', also: 'financial:view' },
+      { href: '/app/fees/reports', label: 'Fee reports', icon: Coins, perm: 'reports:read', also: 'financial:view' },
+      { href: '/app/fees/setup', label: 'Fee setup', icon: Wrench, perm: 'fees.config:read', also: 'financial:view' },
     ],
   },
   {
@@ -87,7 +101,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const scopeOf = (k: PermissionKey) => me.permissions.find((p) => p.key === k)?.scope as Scope | undefined;
-  const allowed = (n: NavItem) => !n.perm || (can(n.perm) && (!n.schoolScope || scopeOf(n.perm) === 'school'));
+  const allowed = (n: NavItem) => !n.perm || (can(n.perm) && (!n.also || can(n.also)) && (!n.schoolScope || scopeOf(n.perm) === 'school'));
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter(allowed) })).filter((g) => g.items.length > 0);
   // the most specific matching entry is the active one (/app/attendance/reports must not also light up /app/attendance)
   const activeHref = groups.flatMap((g) => g.items).map((n) => n.href)
