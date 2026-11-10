@@ -123,6 +123,7 @@ export default function StudentDetailPage() {
       </div>
 
       {can('invoices:read') && can('financial:view') ? <FeesCard studentId={s.id} /> : null}
+      {can('students:update') && s.status === 'active' ? <StudentLoginCard studentId={s.id} /> : null}
 
       {can('guardians:read') ? (
         <section className="space-y-2">
@@ -160,7 +161,7 @@ export default function StudentDetailPage() {
               </tbody>
             </Table>
           ) : null}
-          <p className="text-xs text-muted-foreground">A guardian must be verified (identity checked in person) before portal access can be enabled. The parent portal arrives in a later release.</p>
+          <p className="text-xs text-muted-foreground">A guardian must be verified (identity checked in person) before portal access can be enabled.</p>
         </section>
       ) : null}
 
@@ -282,6 +283,46 @@ function FeesCard({ studentId }: { studentId: string }) {
         <div><p className="text-xs text-muted-foreground">Balance</p><p className="font-semibold">{inr(t.balancePaise)}</p></div>
         <div><p className="text-xs text-muted-foreground">Overdue</p><p className={`font-semibold ${t.overduePaise ? 'text-danger' : ''}`}>{inr(t.overduePaise)}</p></div>
         <div><p className="text-xs text-muted-foreground">Advance</p><p className="font-semibold">{inr(t.advanceCreditPaise)}</p></div>
+      </div>
+    </Card>
+  );
+}
+
+interface AccessStatus { exists: boolean; status?: 'invited' | 'active' | 'suspended'; loginId?: string | null; lastLoginAt?: string | null }
+
+/** Student portal login. Staff hand over a ONE-TIME activation link; the student chooses their own password. */
+function StudentLoginCard({ studentId }: { studentId: string }) {
+  const { me } = useAuth();
+  const qc = useQueryClient();
+  const [issued, setIssued] = useState<{ loginId: string; activationUrl: string; expiresAt: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const st = useQuery({ queryKey: ['student-access', me?.activeMembershipId, studentId], queryFn: async () => (await get<AccessStatus>(`/students/${studentId}/portal-access`)).data });
+  const refresh = () => qc.invalidateQueries({ queryKey: ['student-access'] });
+  const issue = useMutation({ mutationFn: async () => (await post<{ loginId: string; activationUrl: string; expiresAt: string }>(`/students/${studentId}/portal-access`, {})).data, onSuccess: async (d) => { setIssued(d); setCopied(false); await refresh(); } });
+  const toggle = useMutation({ mutationFn: async (enable: boolean) => post(`/students/${studentId}/portal-access/${enable ? 'enable' : 'disable'}`, {}), onSuccess: refresh });
+  const d = st.data;
+  return (
+    <Card className="space-y-3 p-4" data-testid="student-login-card">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-medium">Student login</h2>
+        {d?.exists ? <Badge tone={d.status === 'active' ? 'success' : d.status === 'invited' ? 'primary' : 'warning'}>{d.status === 'invited' ? 'waiting for activation' : d.status}</Badge> : <Badge>no login yet</Badge>}
+      </div>
+      {d?.exists ? <p className="text-sm text-muted-foreground">Login id: <span className="font-mono text-foreground">{d.loginId}</span>{d.lastLoginAt ? ` · last sign-in ${new Date(d.lastLoginAt).toLocaleDateString('en-IN')}` : ''}</p> : <p className="text-sm text-muted-foreground">The student has no portal login. Create one-time activation access and give the link to the student — they choose their own password; staff never see it.</p>}
+      {issue.error ? <Alert>{errorText(issue.error)}</Alert> : null}
+      {toggle.error ? <Alert>{errorText(toggle.error)}</Alert> : null}
+      {issued ? (
+        <Alert tone="success">
+          <div className="space-y-2" data-testid="activation-box">
+            <p>Give this link to the student. It works once, expires {new Date(issued.expiresAt).toLocaleDateString('en-IN')}, and is <strong>not shown again</strong>.</p>
+            <p className="break-all font-mono text-xs" data-testid="activation-url">{issued.activationUrl}</p>
+            <Button size="sm" variant="outline" onClick={() => { void navigator.clipboard?.writeText(issued.activationUrl).then(() => setCopied(true)).catch(() => setCopied(false)); }}>{copied ? 'Copied' : 'Copy link'}</Button>
+          </div>
+        </Alert>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={issue.isPending} onClick={() => { if (!d?.exists || window.confirm('This resets the student\'s password and signs them out everywhere. Continue?')) issue.mutate(); }} data-testid="issue-student-access">{d?.exists ? 'Reset access (new link)' : 'Create login'}</Button>
+        {d?.exists && d.status === 'active' ? <Button size="sm" variant="ghost" className="text-danger" disabled={toggle.isPending} onClick={() => toggle.mutate(false)}>Disable login</Button> : null}
+        {d?.exists && d.status === 'suspended' ? <Button size="sm" variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate(true)}>Enable login</Button> : null}
       </div>
     </Card>
   );

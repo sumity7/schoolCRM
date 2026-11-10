@@ -13,3 +13,7 @@ test-results/
 .DS_Store
 *.tsbuildinfo
 backups/
+.next*/
+# local Playwright run folders and stray tool signal files
+test-results*/
+*claude-notify-signals*

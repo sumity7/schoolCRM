@@ -3,6 +3,7 @@ import { createLogger } from './core/logging/logger';
 import { connectDb, disconnectDb, ensureIndexes } from './core/db/connection';
 import { DevEmailAdapter, DisabledEmailAdapter } from './core/notifications/email';
 import { createApp } from './app';
+import { syncSystemRoles } from './modules/roles/role-seed';
 import { JobQueue } from './core/jobs/job-queue';
 
 async function main() {
@@ -10,6 +11,8 @@ async function main() {
   const logger = createLogger(env.LOG_LEVEL);
   await connectDb(env.DATABASE_URL);
   if (env.NODE_ENV !== 'production') await ensureIndexes(); // production runs `npm run cli -- sync-indexes` as a deploy step
+  const sync = await syncSystemRoles(); // schools created before a new permission existed receive it (additive only)
+  if (sync.grantsAdded || sync.rolesCreated) logger.info(sync, 'system roles synchronised');
   const email = env.EMAIL_ADAPTER === 'disabled' ? new DisabledEmailAdapter() : new DevEmailAdapter(logger);
   const { app } = createApp({ env, logger, email });
   const server = app.listen(env.PORT, env.HOST, () => logger.info({ host: env.HOST, port: env.PORT, env: env.NODE_ENV, label: env.APP_ENV_LABEL }, 'EduNex API listening'));

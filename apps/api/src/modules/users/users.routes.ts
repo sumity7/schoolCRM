@@ -6,11 +6,37 @@ import type { Registrar } from '../../core/http/route';
 import type { SessionService } from '../auth/session.service';
 import { roleRepository } from '../roles/roles.repository';
 import { ParentPortalService } from './parents.service';
+import { StudentAccessService } from './student-access.service';
 import { UsersService } from './users.service';
 
 export function registerUserRoutes(r: Registrar, deps: { env: Env; email: EmailAdapter; sessions: SessionService }) {
   const svc = new UsersService(deps);
   const parents = new ParentPortalService(deps);
+  const studentAccess = new StudentAccessService(deps);
+
+  r.define({
+    method: 'get', path: '/students/:id/portal-access', summary: 'Student login status (never shows a password)', tenancy: 'school', auth: 'session', permission: 'students:update',
+    params: z.object({ id: objectIdSchema }).strict(), idParams: { id: 'student' },
+    async handler({ params }) { return { data: await studentAccess.status(params.id) }; },
+  });
+  r.define({
+    method: 'post', path: '/students/:id/portal-access', summary: 'Issue (or reset) one-time activation access for a student', tenancy: 'school', auth: 'session', permission: 'students:update', rateClass: 'sensitive',
+    params: z.object({ id: objectIdSchema }).strict(), idParams: { id: 'student' }, body: z.object({}).strict(),
+    audit: { exempt: 'StudentAccessService records students.portal_access_issued' },
+    async handler({ params }) { return { status: 201, data: await studentAccess.issue(params.id) }; },
+  });
+  r.define({
+    method: 'post', path: '/students/:id/portal-access/disable', summary: 'Disable a student login (sessions end at once)', tenancy: 'school', auth: 'session', permission: 'students:update', rateClass: 'sensitive',
+    params: z.object({ id: objectIdSchema }).strict(), idParams: { id: 'student' }, body: z.object({}).strict(),
+    audit: { exempt: 'StudentAccessService records students.portal_access_disabled' },
+    async handler({ params }) { await studentAccess.setActive(params.id, false); return { status: 204 }; },
+  });
+  r.define({
+    method: 'post', path: '/students/:id/portal-access/enable', summary: 'Re-enable a disabled student login', tenancy: 'school', auth: 'session', permission: 'students:update', rateClass: 'sensitive',
+    params: z.object({ id: objectIdSchema }).strict(), idParams: { id: 'student' }, body: z.object({}).strict(),
+    audit: { exempt: 'StudentAccessService records students.portal_access_enabled' },
+    async handler({ params }) { await studentAccess.setActive(params.id, true); return { status: 204 }; },
+  });
 
   r.define({
     method: 'post', path: '/students/:id/guardians/:linkId/portal-invite', summary: 'Invite a verified guardian to the parent portal (email)', tenancy: 'school', auth: 'session', permission: 'guardians:update', rateClass: 'sensitive',

@@ -51,6 +51,30 @@ export function registerParentRoutes(r: Registrar) {
   });
 
   r.define({
+    method: 'get', path: '/parent/children/:id/profile', summary: 'A linked child profile overview (class, roll, guardian relationship)', tenancy: 'school', auth: 'session', allowOwnScope: true, permission: 'students:read',
+    params: childParam, idParams: { id: 'student' },
+    async handler({ params }) {
+      guard();
+      const link = await assertChild(params.id);
+      const s = await studentRepo.getById(params.id);
+      const session = await sessionRepo.findActive();
+      const enr = session ? await enrollmentRepo.findOne({ studentId: s._id, sessionId: session._id }) : null;
+      const [cls, sec] = enr ? await Promise.all([classRepo.findById(enr.classId), sectionRepo.findById(enr.sectionId)]) : [null, null];
+      return { data: { id: String(s._id), name: [s.firstName, s.lastName].filter(Boolean).join(' '), admissionNo: s.admissionNo, dob: s.dob, gender: s.gender ?? null, admissionDate: s.admissionDate, status: s.status, relationship: link.relationship, className: cls?.name ?? null, sectionName: sec?.name ?? null, rollNo: enr?.rollNo ?? null, session: session?.name ?? null } };
+    },
+  });
+
+  r.define({
+    method: 'get', path: '/parent/school-contact', summary: 'The school public contact details (name, phone, e-mail, address)', tenancy: 'school', auth: 'session', allowOwnScope: true, permission: 'students:read',
+    async handler({ tenant }) {
+      guard();
+      const school = await getSchoolById(tenant.schoolId);
+      const a = school.address ?? {};
+      return { data: { name: school.name, phone: school.phone ?? null, email: school.officialEmail ?? null, address: [a.line1, a.line2, a.city, a.state, a.postalCode].filter(Boolean).join(', ') || null } };
+    },
+  });
+
+  r.define({
     method: 'get', path: '/parent/children/:id/attendance', summary: 'A linked child\'s attendance in a date range', tenancy: 'school', auth: 'session', allowOwnScope: true, permission: 'attendance:read',
     params: childParam, idParams: { id: 'student' }, query: z.object({ from: dayStringSchema, to: dayStringSchema }).strict(),
     async handler({ params, query, tenant }) {

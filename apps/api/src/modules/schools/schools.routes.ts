@@ -38,6 +38,7 @@ const settingsPatch = z
     themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     language: z.enum(['en', 'hi']),
     academicYearStartMonth: z.number().int().min(1).max(12),
+    portalPolicy: z.object({ studentsSeeFees: z.boolean(), studentsSeeRank: z.boolean(), parentsSeeFees: z.boolean(), parentsSeeRank: z.boolean(), parentsSeeResults: z.boolean() }).partial().strict(),
     attendancePolicy: z
       .object({
         teacherEditWindowDays: z.number().int().min(0).max(30),
@@ -88,8 +89,8 @@ export function registerSchoolRoutes(r: Registrar) {
       const before = await getSchoolById(tenant.schoolId);
       const patch: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(body)) {
-        if (k === 'attendancePolicy') {
-          for (const [pk, pv] of Object.entries(v as object)) patch[`settings.attendancePolicy.${pk}`] = pv;
+        if (k === 'attendancePolicy' || k === 'portalPolicy') {
+          for (const [pk, pv] of Object.entries(v as object)) patch[`settings.${k}.${pk}`] = pv;
         } else patch[`settings.${k}`] = v;
       }
       const after = await updateSchoolProfile(tenant.schoolId, patch);

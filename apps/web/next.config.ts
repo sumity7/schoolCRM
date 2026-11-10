@@ -21,6 +21,8 @@ const CSP = process.env.NODE_ENV === 'production'
   : "frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
 const config: NextConfig = {
+  // Optional separate build directory (e.g. NEXT_DIST_DIR=.next-build) so a production build never touches the .next used by a running dev server.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   output: 'standalone',
   // Monorepo root: the standalone bundle must trace @edunex/shared from here, never from a lockfile further up the disk.
   outputFileTracingRoot: path.join(__dirname, '..', '..'),

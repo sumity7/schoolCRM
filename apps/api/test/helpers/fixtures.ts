@@ -120,8 +120,17 @@ export async function buildExamData(sd: SchoolData): Promise<ExamData> {
   must(await o.put(`/exams/${ex.body.data.id}/subjects`, { subjects: [{ classId: sd.classId, subjectId: sd.subjectId, maxMarks: 50, passMarks: 17 }] }), 200, 'subjects');
   must(await o.post(`/exams/${ex.body.data.id}/open-marks`), 200, 'open');
   must(await o.put(`/exams/${ex.body.data.id}/marks`, { sectionId: sd.sectionA, subjectId: sd.subjectId, entries: sd.studentsA.map((studentId, i) => ({ studentId, obtained: 40 - i, status: 'entered' })) }), 200, 'marks');
+  must(await o.put(`/exams/${ex.body.data.id}/marks`, { sectionId: sd.sectionB, subjectId: sd.subjectId, entries: sd.studentsB.map((studentId, i) => ({ studentId, obtained: 35 - i, status: 'entered' })) }), 200, 'marks B'); // complete, so the exam can be published
   must(await o.post(`/exams/${ex.body.data.id}/lock-marks`), 200, 'lock');
   must(await o.post(`/exams/${ex.body.data.id}/results/compute`), 200, 'compute');
   const res = must(await o.get(`/exams/${ex.body.data.id}/results?sectionId=${sd.sectionA}`), 200, 'results');
   return { scaleId: scale.body.data.id, examId: ex.body.data.id, resultId: res.body.data[0].id };
+}
+
+/** Staff issues activation access; the STUDENT activates and chooses their own password (as in production). */
+export async function seedStudentLogin(app: Express, sd: SchoolData, studentId: string, password = 'Student-Pass-123') {
+  const issued = must(await sd.owner.post(`/students/${studentId}/portal-access`), 201, 'issue student access');
+  const token = /token=([A-Za-z0-9_-]+)/.exec(issued.body.data.activationUrl)![1]!;
+  must(await new Client(app).post('/auth/accept-invite', { token, password }), 204, 'activate student');
+  return { client: await loggedIn(app, issued.body.data.loginId, password), loginId: issued.body.data.loginId as string, password };
 }

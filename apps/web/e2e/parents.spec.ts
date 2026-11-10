@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { WEB_ORIGIN } from './env';
 
 /** E2E-10 parent portal + notices (R3). Synthetic data; re-runnable (notice titles are run-unique). */
 const PASSWORD = 'Correct-Horse-9';
@@ -16,7 +17,7 @@ test.describe('E2E-10 parent portal & notices', () => {
   test('owner publishes a section notice; the parent sees their child, attendance and the notice — and nothing else', async ({ browser, page }) => {
     const r = run();
     // staff side
-    const staffCtx = await browser.newContext({ baseURL: 'http://localhost:3100' });
+    const staffCtx = await browser.newContext({ baseURL: WEB_ORIGIN });
     const staff = await staffCtx.newPage();
     await login(staff, 'owner@alpha.test');
     await staff.goto('/app/notices');

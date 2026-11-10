@@ -8,12 +8,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { passwordSchema } from '@edunex/shared';
 import { z } from 'zod';
 import { ApiError, post } from '@/lib/api';
+import { useHydrated } from '@/lib/use-hydrated';
 import { Alert, Button, Card, Field, Input } from '@/components/ui/primitives';
 
 const schema = z.object({ password: passwordSchema, confirm: z.string() }).refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Passwords do not match' });
 type Values = z.infer<typeof schema>;
 
 function Form() {
+  const hydrated = useHydrated();
   const token = useSearchParams().get('token') ?? '';
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ function Form() {
       Password updated. All other sessions were signed out. <Link href="/login" className="underline">Sign in</Link>
     </Alert>
   ) : (
-    <form onSubmit={onSubmit} className="mt-4 space-y-4" noValidate>
+    <form onSubmit={onSubmit} method="post" className="mt-4 space-y-4" noValidate>
       {error ? <Alert>{error}</Alert> : null}
       <Field label="New password" htmlFor="password" error={formState.errors.password?.message}>
         <Input id="password" type="password" autoComplete="new-password" {...register('password')} />
@@ -41,7 +43,7 @@ function Form() {
       <Field label="Confirm password" htmlFor="confirm" error={formState.errors.confirm?.message}>
         <Input id="confirm" type="password" autoComplete="new-password" {...register('confirm')} />
       </Field>
-      <Button type="submit" className="w-full" disabled={formState.isSubmitting}>
+      <Button type="submit" className="w-full" disabled={!hydrated || formState.isSubmitting}>
         Set new password
       </Button>
     </form>

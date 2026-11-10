@@ -1,8 +1,9 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { WEB_ORIGIN } from './env';
 
 /** E2E-11 exams & results (R4). Re-runnable: scale and exam names are run-unique. */
 const PASSWORD = 'Correct-Horse-9';
-const WEB = 'http://localhost:3100';
+const WEB = WEB_ORIGIN;
 async function login(page: Page, email: string) {
   await page.goto('/login');
   await page.getByTestId('identifier').fill(email);

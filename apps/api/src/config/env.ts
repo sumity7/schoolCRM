@@ -39,6 +39,12 @@ const schema = z.object({
   RATE_LIMIT_ENABLED: bool.default('true'),
   /** In-process background worker (notice e-mails …). Tests drain the queue explicitly. */
   JOBS_ENABLED: bool.default('true'),
+  /** Login-page demo accounts (development only). Unset = on in development, off everywhere else. Refused in production/staging. */
+  DEMO_LOGIN_ENABLED: bool.optional(),
+  /** Where uploaded files (homework attachments / submissions) are stored. Local disk only; NEVER inside a publicly served directory. */
+  UPLOAD_DIR: z.string().optional(),
+  /** Largest accepted upload, in bytes (default 5 MB; hard cap 10 MB). */
+  UPLOAD_MAX_BYTES: z.coerce.number().int().min(1024).max(10 * 1024 * 1024).default(5 * 1024 * 1024),
   /** Encrypts TOTP secrets at rest. MUST be set to a long random value in production. */
   MFA_ENCRYPTION_KEY: z.string().min(16).default('dev-only-mfa-key-not-for-production'),
 });
@@ -66,5 +72,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       throw new Error('Paid/unauthorised integration flags must remain false until explicitly approved');
     }
   }
-  return env;
+  if (env.DEMO_LOGIN_ENABLED && (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging')) {
+    throw new Error('DEMO_LOGIN_ENABLED must not be true in production or staging');
+  }
+  // Server-controlled: never derived from the client. Production/staging are always off.
+  return { ...env, DEMO_LOGIN_ENABLED: env.DEMO_LOGIN_ENABLED ?? env.NODE_ENV === 'development' };
 }

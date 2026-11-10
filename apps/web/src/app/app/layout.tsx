@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, BadgeCheck, Baby, ShieldCheck, BarChart3, Megaphone, NotebookPen, Building2, Coins, FileText, Percent, Receipt, Wallet, Wrench, CalendarCheck, CalendarDays, ClipboardCheck, GraduationCap, History, Layers, LayoutDashboard, LogOut, Menu, Moon, Sun, Upload, UserCog, Users, X } from 'lucide-react';
+import { BookOpenCheck, CalendarClock, ArrowUpRight, BadgeCheck, Baby, BookUser, ShieldCheck, BarChart3, Megaphone, NotebookPen, Building2, Coins, FileText, Percent, Receipt, Wallet, Wrench, CalendarCheck, CalendarDays, ClipboardCheck, GraduationCap, History, Layers, LayoutDashboard, LogOut, Menu, Moon, Sun, Upload, UserCog, Users, X } from 'lucide-react';
 import type { PermissionKey, Scope } from '@edunex/shared';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,11 @@ const PARENT_NAV: Array<{ group?: string; items: NavItem[] }> = [
   { items: [{ href: '/app', label: 'My children', icon: Baby }, { href: '/app/notices', label: 'Notices', icon: Megaphone }] },
 ];
 
+/** Students get their own minimal menu; every route behind it is own-record only. */
+const STUDENT_NAV: Array<{ group?: string; items: NavItem[] }> = [
+  { items: [{ href: '/app', label: 'Dashboard', icon: LayoutDashboard }, { href: '/app/me', label: 'My records', icon: BookUser }, { href: '/app/timetable', label: 'Timetable', icon: CalendarClock }, { href: '/app/homework', label: 'Homework', icon: BookOpenCheck }, { href: '/app/notices', label: 'Notices', icon: Megaphone }] },
+];
+
 const NAV: Array<{ group?: string; items: NavItem[] }> = [
   {
     items: [
@@ -37,6 +42,8 @@ const NAV: Array<{ group?: string; items: NavItem[] }> = [
       { href: '/app/imports', label: 'Imports', icon: Upload, perm: 'imports:create' },
       { href: '/app/staff', label: 'Staff', icon: Users, perm: 'staff:read', schoolScope: true },
       { href: '/app/exams', label: 'Exams & results', icon: NotebookPen, perm: 'exams:read' },
+      { href: '/app/timetable', label: 'Timetable', icon: CalendarClock, perm: 'timetable:read' },
+      { href: '/app/homework', label: 'Homework', icon: BookOpenCheck, perm: 'homework:read' },
       { href: '/app/notices', label: 'Notices', icon: Megaphone, perm: 'notices:read' },
     ],
   },
@@ -111,7 +118,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const scopeOf = (k: PermissionKey) => me.permissions.find((p) => p.key === k)?.scope as Scope | undefined;
   const allowed = (n: NavItem) => !n.perm || (can(n.perm) && (!n.also || can(n.also)) && (!n.schoolScope || scopeOf(n.perm) === 'school'));
   const isParent = me.roleKeys.includes('parent');
-  const groups = (isParent ? PARENT_NAV : NAV).map((g) => ({ ...g, items: g.items.filter(allowed) })).filter((g) => g.items.length > 0);
+  const isStudent = me.roleKeys.includes('student');
+  const groups = (isParent ? PARENT_NAV : isStudent ? STUDENT_NAV : NAV).map((g) => ({ ...g, items: g.items.filter(allowed) })).filter((g) => g.items.length > 0);
   // the most specific matching entry is the active one (/app/attendance/reports must not also light up /app/attendance)
   const activeHref = groups.flatMap((g) => g.items).map((n) => n.href)
     .filter((h) => (h === '/app' ? path === '/app' : path === h || path.startsWith(`${h}/`)))
@@ -136,8 +144,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[240px_1fr]">
-      <aside className="hidden bg-sidebar md:block">
+    <div className="min-h-dvh md:grid md:grid-cols-[240px_1fr] print:block">
+      <aside className="hidden bg-sidebar md:block print:hidden">
         <div className="px-5 py-4 text-base font-semibold text-white">EduNex</div>
         {nav}
       </aside>
@@ -154,7 +162,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b border-border bg-card px-3 sm:px-5">
+        <header className="sticky top-0 z-30 print:hidden flex min-h-14 items-center gap-2 border-b border-border bg-card px-3 sm:px-5">
           <button aria-label="Open menu" className="min-h-11 min-w-11 md:hidden" onClick={() => setOpen(true)}><Menu className="mx-auto h-5 w-5" /></button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold" data-testid="school-name">{me.school?.name}</p>

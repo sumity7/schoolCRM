@@ -16,7 +16,7 @@ const PLATFORM_ACCESS = [
 ];
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**', '**/.data/**', 'apps/web/next-env.d.ts', '**/playwright-report/**', '**/test-results/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.next-*/**', '**/coverage/**', '**/.data/**', 'apps/web/next-env.d.ts', '**/playwright-report/**', '**/test-results/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -27,7 +27,7 @@ const env = loadEnv({
   NODE_ENV: 'test', PORT: process.env.E2E_API_PORT ?? '4100', DATABASE_URL: uri.toString(),
   // :3000 is the Origin the seeding helpers send; the attacker origin :3200 is deliberately NOT allowed.
   ALLOWED_ORIGINS: `${process.env.E2E_WEB_ORIGIN ?? 'http://localhost:3100'},http://localhost:3000`,
-  RATE_LIMIT_ENABLED: 'false', LOG_LEVEL: 'warn',
+  RATE_LIMIT_ENABLED: 'false', LOG_LEVEL: 'warn', DEMO_LOGIN_ENABLED: 'true',
 } as NodeJS.ProcessEnv);
 await connectDb(env.DATABASE_URL);
 await ensureIndexes();
@@ -43,6 +43,14 @@ await seedMember(alpha.school.schoolId, 'multi@x.test', ['admin'], { name: 'Mult
 await seedMember(bravo.school.schoolId, 'multi@x.test', ['admin'], { name: 'Multi Admin' });
 // Parent of alpha-A1 (Ravi Rao): verified link, portal on, active guardian login — what an accepted invitation produces.
 await seedParent(app, alpha, alpha.studentsA[0]!, 'parent@alpha.test');
+// A parent with TWO children (alpha-A2 and alpha-A3) for the child-switching journey.
+{
+  await alpha.owner.post(`/students/${alpha.studentsA[1]}/guardians`, { name: 'Meera Twin', phone: '9822222222', relationship: 'mother', isPrimary: true });
+  const twins = await seedParent(app, alpha, alpha.studentsA[1]!, 'twins@alpha.test');
+  const l = await alpha.owner.post(`/students/${alpha.studentsA[2]}/guardians`, { name: 'Ravi Rao', phone: '9811111111', relationship: 'father', existingGuardianId: twins.guardianId });
+  await alpha.owner.patch(`/students/${alpha.studentsA[2]}/guardians/${l.body.data.linkId}`, { verified: true });
+  await alpha.owner.patch(`/students/${alpha.studentsA[2]}/guardians/${l.body.data.linkId}`, { portalAccess: true });
+}
 // Platform Super Admin with two-factor ON and a KNOWN test secret (E2E computes real TOTP codes from it). Synthetic.
 {
   const { createSuperAdmin } = await import('../src/modules/schools/schools.service');
@@ -50,6 +58,12 @@ await seedParent(app, alpha, alpha.studentsA[0]!, 'parent@alpha.test');
   const { users } = await import('../src/modules/auth/auth.repository');
   const u = await createSuperAdmin({ email: 'root@edunex.test', name: 'Root Admin', password: 'Correct-Horse-9' });
   await users.updateOne({ _id: u._id }, { $set: { mfa: { type: 'totp', secretEnc: encryptSecret('JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', env.MFA_ENCRYPTION_KEY), enabledAt: new Date() } } }, 'e2e: mfa');
+}
+
+// Demo accounts for the login-page quick access (same idempotent seeder as `npm run seed:demo`).
+{
+  const { ensureDemoAccounts } = await import('./lib/demo-seed');
+  await ensureDemoAccounts(app);
 }
 
 app.listen(env.PORT, () => console.log(`E2E API ready on ${env.PORT} (synthetic data seeded)`));

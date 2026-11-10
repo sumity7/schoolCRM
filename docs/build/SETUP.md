@@ -29,9 +29,15 @@ Use **synthetic data only**; never load real student data into a development mac
 After `create-super-admin`, sign in at `/login`: you land on `/platform`, which first asks you to turn on two-factor authentication (enter the shown key in an authenticator app). From then on every sign-in asks for the 6-digit code. Schools can then be created from the console instead of the CLI.
 
 ### Notes
-- `npm run seed:demo` creates a synthetic school: `owner@demo.test` / `tina@demo.test`, password `Correct-Horse-9`.
+- `npm run seed:demo` creates (or tops up — it is idempotent and only adds) a synthetic school and its demo logins, all with password `Correct-Horse-9`: `owner@demo.test` (School Admin), `tina@demo.test` (Teacher), `accountant@demo.test`, `parent@demo.test`, `demo-a1@demo.student` (Student), `root@demo.test` (Super Admin — enrol an authenticator app on first sign-in). It refuses to run in production/staging and never deletes data.
 - Set `DEV_DB_PATH` to put the dev database somewhere else (e.g. if `apps/api/.data/mongo` was left broken by an interrupted first start).
 - Set `MONGOMS_SYSTEM_BINARY` to reuse an installed `mongod` instead of downloading one.
+
+### Login-page demo accounts (development only)
+With `NODE_ENV=development` the login page shows "Try EduNex ERP Demo": six role cards. Clicking a card only **fills** the form (it never signs you in); press **Sign in** as usual and you land on the dashboard of the real server-side role. Cards for accounts that do not exist show "Demo account not configured yet." — run `npm run seed:demo` to create them.
+- Controlled by the server flag `DEMO_LOGIN_ENABLED` (default: on only in development). The API refuses to start with it on in production/staging, the `/auth/demo-accounts` route does not exist when it is off, and demo credentials are never part of the web bundle.
+- After a production build, `npm run check:bundle --workspace @edunex/web` fails if any demo credential or demo-login code is found in the output.
+- Do not run a production `next build` while a dev server is using `apps/web/.next`.
 
 ## Tests
 ```

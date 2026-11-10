@@ -78,6 +78,33 @@ export const PERMISSION_KEYS = [
   'imports:create',
   'imports:approve',
   'audit:read',
+  // --- remaining-features phase (2026-11)
+  'timetable:read',
+  'timetable:create',
+  'timetable:update',
+  'homework:read',
+  'homework:create',
+  'homework:update',
+  'homework:submit',
+  'admissions:read',
+  'admissions:create',
+  'admissions:update',
+  'admissions:approve',
+  'library:read',
+  'library:create',
+  'library:update',
+  'library:issue',
+  'transport:read',
+  'transport:create',
+  'transport:update',
+  'inventory:read',
+  'inventory:create',
+  'inventory:update',
+  'documents:read',
+  'documents:create',
+  'documents:issue',
+  'integrations:manage',
+  'subscription:read',
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -174,6 +201,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
         'guardians:read', 'staff:read', 'attendance:read', 'attendance:approve', 'attendance:export', 'exams:read', 'exams:approve',
         'marks:read', 'results:read', 'results:approve', 'results:publish', 'results:export', 'results:print', 'reports:read', 'reports:export',
         'notices:create', 'notices:read', 'audit:read',
+        'timetable:read', 'homework:read', 'admissions:read', 'library:read', 'transport:read', 'inventory:read', 'documents:read', 'documents:issue', 'subscription:read',
       ],
       'school',
     ),
@@ -200,9 +228,9 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     description: 'Assigned classes and subjects',
     personTypes: ['staff'],
     grants: [
-      ...g(['school.settings:read', 'academics:read', 'exams:read', 'notices:read'], 'school'),
+      ...g(['school.settings:read', 'academics:read', 'exams:read', 'notices:read', 'timetable:read', 'library:read'], 'school'),
       ...g(
-        ['students:read', 'guardians:read', 'attendance:create', 'attendance:read', 'attendance:update', 'marks:create', 'marks:read', 'marks:update', 'results:read', 'reports:read', 'notices:create'],
+        ['students:read', 'guardians:read', 'attendance:create', 'attendance:read', 'attendance:update', 'marks:create', 'marks:read', 'marks:update', 'results:read', 'reports:read', 'notices:create', 'homework:create', 'homework:read', 'homework:update'],
         'assigned',
       ),
       ...g(['staff:read'], 'own'),
@@ -214,10 +242,10 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     description: 'Teacher plus oversight of the assigned class',
     personTypes: ['staff'],
     grants: [
-      ...g(['school.settings:read', 'academics:read', 'exams:read', 'notices:read'], 'school'),
+      ...g(['school.settings:read', 'academics:read', 'exams:read', 'notices:read', 'timetable:read', 'library:read'], 'school'),
       ...g(
         [
-          'students:read', 'students:update', 'students.medical:read', 'guardians:read', 'attendance:create', 'attendance:read', 'attendance:update',
+          'homework:create', 'homework:read', 'homework:update', 'students:read', 'students:update', 'students.medical:read', 'guardians:read', 'attendance:create', 'attendance:read', 'attendance:update',
           'attendance:approve', 'marks:create', 'marks:read', 'marks:update', 'results:read', 'results:print', 'reports:read', 'notices:create',
         ],
         'assigned',
@@ -230,14 +258,14 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     name: 'Librarian',
     description: 'Library operations (module arrives later)',
     personTypes: ['staff'],
-    grants: [...g(['school.settings:read', 'academics:read', 'students:read', 'notices:read'], 'school'), ...g(['staff:read'], 'own')],
+    grants: [...g(['school.settings:read', 'academics:read', 'students:read', 'notices:read', 'library:read', 'library:create', 'library:update', 'library:issue', 'reports:read'], 'school'), ...g(['staff:read'], 'own')],
   },
   {
     key: 'transport_manager',
     name: 'Transport Manager',
-    description: 'Transport operations (module arrives later)',
+    description: 'Vehicles, drivers, routes and student transport',
     personTypes: ['staff'],
-    grants: [...g(['school.settings:read', 'academics:read', 'students:read', 'notices:read'], 'school'), ...g(['staff:read'], 'own')],
+    grants: [...g(['school.settings:read', 'academics:read', 'students:read', 'notices:read', 'staff:read', 'transport:read', 'transport:create', 'transport:update', 'reports:read'], 'school'), ...g(['staff:read'], 'own')],
   },
   {
     key: 'receptionist',
@@ -246,7 +274,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     personTypes: ['staff'],
     grants: [
       ...g(
-        ['school.settings:read', 'academics:read', 'students:create', 'students:read', 'students:update', 'guardians:create', 'guardians:read', 'guardians:update', 'students.documents:create', 'students.documents:read', 'notices:read', 'reports:read'],
+        ['school.settings:read', 'academics:read', 'students:create', 'students:read', 'students:update', 'guardians:create', 'guardians:read', 'guardians:update', 'students.documents:create', 'students.documents:read', 'notices:read', 'reports:read', 'admissions:read', 'admissions:create', 'admissions:update', 'documents:read'],
         'school',
       ),
       ...g(['staff:read'], 'own'),
@@ -257,14 +285,14 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     name: 'Parent / Guardian',
     description: 'Linked children only',
     personTypes: ['guardian'],
-    grants: g(['students:read', 'attendance:read', 'results:read', 'results:print', 'notices:read', 'invoices:read', 'payments:read', 'payments:print', 'students.documents:read'], 'own'),
+    grants: g(['students:read', 'attendance:read', 'results:read', 'results:print', 'notices:read', 'invoices:read', 'payments:read', 'payments:print', 'students.documents:read', 'timetable:read', 'homework:read', 'documents:read'], 'own'),
   },
   {
     key: 'student',
     name: 'Student',
     description: 'Own academic information only',
     personTypes: ['student'],
-    grants: g(['students:read', 'attendance:read', 'results:read', 'results:print', 'notices:read'], 'own'),
+    grants: g(['students:read', 'attendance:read', 'results:read', 'results:print', 'notices:read', 'timetable:read', 'homework:read', 'homework:submit', 'documents:read'], 'own'),
   },
 ];
 

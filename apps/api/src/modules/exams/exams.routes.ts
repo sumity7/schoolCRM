@@ -10,6 +10,7 @@ import { classRepo, sectionRepo, sessionRepo, subjectRepo } from '../academics/a
 import { enrollmentRepo, studentRepo } from '../students/students.repository';
 import { getSchoolById } from '../schools/schools.service';
 import { assertChild, isGuardian } from '../parent/parent-access';
+import { getPortalPolicy } from '../schools/portal-policy';
 import { ExamsService, resultDto } from './exams.service';
 import { examRepo, examSubjectRepo, gradingScaleRepo, resultRepo } from './exams.repository';
 import { renderReportCard } from './report-card.pdf';
@@ -27,7 +28,7 @@ async function assertResultSection(scope: Scope | undefined, sectionId: unknown)
   await AcademicsService.assertSectionAccess(scope, sectionId);
 }
 
-async function reportCardFor(resultId: string, schoolId: Parameters<typeof getSchoolById>[0]) {
+export async function reportCardFor(resultId: string, schoolId: Parameters<typeof getSchoolById>[0]) {
   const r = await resultRepo.getById(resultId, 'Result');
   const [exam, school, s, sec, cls] = await Promise.all([examRepo.getById(r.examId), getSchoolById(schoolId), studentRepo.getById(r.studentId), sectionRepo.findById(r.sectionId), classRepo.findById(r.classId)]);
   const session = await sessionRepo.findById(exam.sessionId);
@@ -178,9 +179,11 @@ export function registerExamRoutes(r: Registrar) {
     async handler({ params }) {
       if (!isGuardian()) throw forbidden('This area is for parents and guardians');
       const link = await assertChild(params.id);
+      const policy = await getPortalPolicy();
+      if (!policy.parentsSeeResults) throw forbidden('The school has not enabled results in the parent portal');
       const rows = await resultRepo.find({ studentId: link.studentId, current: true, publishedAt: { $ne: null } }, { sort: { publishedAt: -1 } });
       const exams = new Map((await examRepo.findByIds(rows.map((x) => x.examId))).map((e) => [String(e._id), e]));
-      return { data: await Promise.all(rows.map(async (x) => ({ ...(await resultDto(x)), examName: exams.get(String(x.examId))?.name ?? '' }))) };
+      return { data: await Promise.all(rows.map(async (x) => ({ ...(await resultDto(x)), rank: policy.parentsSeeRank ? x.rank : null, examName: exams.get(String(x.examId))?.name ?? '' }))) };
     },
   });
   r.define({

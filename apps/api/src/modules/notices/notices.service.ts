@@ -10,7 +10,8 @@ import { AcademicsService } from '../academics/academics.service';
 import { sectionRepo, sessionRepo } from '../academics/academics.repository';
 import { enrollmentRepo, guardianRepo, studentGuardianRepo } from '../students/students.repository';
 import { getSchoolById } from '../schools/schools.service';
-import { isGuardian, linkedChildren } from '../parent/parent-access';
+import { isGuardian, isStudentUser, linkedChildren } from '../parent/parent-access';
+import { studentRepo } from '../students/students.repository';
 import { noticeDeliveryRepo, noticeReadRepo, noticeRepo } from './notices.repository';
 import type { NoticeAudience } from './notices.model';
 
@@ -55,6 +56,13 @@ export const NoticesService = {
   async visibleFilter(readScope: Scope | undefined, canManage: boolean): Promise<Record<string, unknown>> {
     const tenant = requireTenant('notices.visible');
     const base = { status: 'published' };
+    if (isStudentUser()) {
+      // students see everyone-notices and notices for their own class only — never staff/parent-only ones
+      const s = await studentRepo.findById(tenant.personId);
+      const session = await sessionRepo.findActive();
+      const enr = s && session ? await enrollmentRepo.findOne({ studentId: s._id, sessionId: session._id, status: 'active' }) : null;
+      return { ...base, $or: [{ audience: 'everyone' }, { audience: 'sections', sectionIds: { $in: enr ? [enr.sectionId] : [] } }] };
+    }
     if (isGuardian()) {
       const secs = await activeSectionIdsOfChildren();
       return { ...base, $or: [{ audience: { $in: ['everyone', 'parents'] } }, { audience: 'sections', sectionIds: { $in: secs } }] };

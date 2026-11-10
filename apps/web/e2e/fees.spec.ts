@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { WEB_ORIGIN } from './env';
 
 /** E2E-09 fee desk (doc 11 §2.1 "later releases add their own critical flows (e.g. R2 fee collection)"). Synthetic data; re-runnable. */
 const PASSWORD = 'Correct-Horse-9';
-const WEB = 'http://localhost:3100';
+const WEB = WEB_ORIGIN;
 
 async function login(page: Page, email: string) {
   await page.goto('/login');

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { Card, Skeleton } from '@/components/ui/primitives';
 import { inr } from '@/lib/fees';
 import { ParentHome } from '@/components/parent-home';
+import { StudentHome } from '@/components/student-home';
 
 const todayInIndia = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
@@ -14,7 +15,17 @@ interface Entitlements { limits: { students: number; staff: number } }
 /** Real data only: counts come from the API; nothing is fabricated. Charts arrive with reports that have data to show. */
 export default function DashboardPage() {
   const { me } = useAuth();
-  return me?.roleKeys.includes('parent') ? <ParentHome /> : <StaffDashboard />;
+  if (me?.roleKeys.includes('parent')) return <ParentHome />;
+  if (me?.roleKeys.includes('student')) return <StudentHome />;
+  return <StaffDashboard />;
+}
+
+/** Role-aware heading (the roles come from the server session — never from what the person clicked on the login page). */
+function dashboardTitle(roles: string[]): string {
+  if (roles.some((r) => ['owner', 'admin', 'principal'].includes(r))) return 'School admin dashboard';
+  if (roles.includes('accountant')) return 'Finance dashboard';
+  if (roles.some((r) => ['teacher', 'class_teacher'].includes(r))) return 'Teacher dashboard';
+  return 'Dashboard';
 }
 
 function StaffDashboard() {
@@ -29,7 +40,8 @@ function StaffDashboard() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Welcome, {me?.user.name}</h1>
+        <h1 className="text-xl font-semibold" data-testid="dashboard-title">{dashboardTitle(me?.roleKeys ?? [])}</h1>
+        <p className="text-sm text-muted-foreground">Welcome, {me?.user.name}</p>
         <p className="text-sm text-muted-foreground">{me?.school?.name}</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

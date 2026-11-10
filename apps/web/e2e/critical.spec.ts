@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+import { WEB_ORIGIN } from './env';
 
 /**
  * Mandatory critical browser flows (docs/phase-0/11 §2.1). API tests do NOT replace these.
  * Synthetic seed data only (apps/api/scripts/e2e-server.ts). Password for all users: Correct-Horse-9
  */
 const PASSWORD = 'Correct-Horse-9';
-const WEB = 'http://localhost:3100';
+const WEB = WEB_ORIGIN;
 const EVIL = 'http://localhost:3200';
 
 async function login(page: Page, email: string) {

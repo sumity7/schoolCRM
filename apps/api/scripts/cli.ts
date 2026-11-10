@@ -8,7 +8,7 @@
  *   set-limits --code demo --students 1500 --staff 120
  *   suspend-school --code demo   |   reactivate-school --code demo   |   deactivate-school --code demo
  *   list-schools
- *   sync-indexes
+ *   sync-indexes | sync-roles   (sync-roles adds new template permissions to existing schools; additive only)
  *
  * Backups & data portability (passphrase ALWAYS from env BACKUP_PASSPHRASE, ≥ 16 chars; never on the command line):
  *   backup [--dir ./.data/backups] [--prune]         encrypted whole-DB backup; --prune applies 7d/4w/6m retention
@@ -144,6 +144,11 @@ async function main() {
         const pass = assertPassphrase(process.env.BACKUP_PASSPHRASE);
         const r = await restoreSchool(db(), resolve(need(f, 'file')), pass);
         console.log(`Restored school ${r.schoolId}: ${r.documents} documents; users created ${r.usersCreated}, already present ${r.usersExisting}. Restored users must use "Forgot password".`);
+        break;
+      }
+      case 'sync-roles': {
+        const { syncSystemRoles } = await import('../src/modules/roles/role-seed');
+        console.log(JSON.stringify(await syncSystemRoles()));
         break;
       }
       case 'sync-indexes':

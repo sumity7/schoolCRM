@@ -187,6 +187,9 @@ export class AuthService {
     const row = await this.consumeToken(token, 'invite');
     const user = (await users.findById(row.userId, 'auth: invite user')) as UserRow | null;
     if (!user || !row.membershipId) throw validationFailed('This link is invalid or has expired');
+    // Validate the membership BEFORE changing the user, so a stale/revoked invitation changes nothing.
+    const pending = await memberships.findOne({ _id: row.membershipId, userId: user._id, status: 'invited' }, 'auth: invite membership');
+    if (!pending) throw validationFailed('This link is invalid or has expired');
     const patch: Record<string, unknown> = {};
     if (!user.passwordHash) {
       if (!password) {
@@ -196,12 +199,13 @@ export class AuthService {
       }
       patch.passwordHash = await hashPassword(password);
     }
-    if (name) patch.name = name;
+    // A student's name comes from the school's record; the activation page cannot rename them.
+    if (name && (pending as unknown as { personType?: string }).personType !== 'student') patch.name = name;
     if (row.channel === 'email') patch.emailVerifiedAt = new Date();
     patch.status = 'active';
-    await users.updateOne({ _id: user._id }, { $set: patch }, 'auth: accept invite user');
     const m = await memberships.findOneAndUpdate({ _id: row.membershipId, userId: user._id, status: 'invited' }, { $set: { status: 'active' } }, 'auth: activate membership');
-    if (!m) throw validationFailed('This invitation is no longer valid');
+    if (!m) throw validationFailed('This link is invalid or has expired');
+    await users.updateOne({ _id: user._id }, { $set: patch }, 'auth: accept invite user');
     await AuditService.record({ action: 'auth.invite_accepted', entityType: 'membership', entityId: m._id, actorUserId: user._id, schoolId: (m as unknown as { schoolId: Types.ObjectId }).schoolId });
   }
 }

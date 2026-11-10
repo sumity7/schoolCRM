@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { addDays } from '@edunex/shared';
 import { setupTestDb, teardownTestDb, clearAll } from './helpers/db';
 import { Client, loggedIn, makeTestApp, seedMember } from './helpers/app';
-import { buildSchoolData, seedParent, todayIst, type SchoolData } from './helpers/fixtures';
+import { buildSchoolData, seedParent, seedStudentLogin, todayIst, type SchoolData } from './helpers/fixtures';
 import { JobQueue, registerJobHandler } from '../src/core/jobs/job-queue';
 import { JobModel } from '../src/core/jobs/job.model';
 import { runAsPlatform, runWithTenant } from '../src/core/tenancy/context';
@@ -209,5 +209,63 @@ describe('REQ-NOT notices', () => {
     expect(parentSees).toEqual(['For 5A', 'Holiday']);
     const teacherSees = ((await A.teacher.get('/notices')).body.data as Array<{ title: string }>).map((x) => x.title).sort();
     expect(teacherSees).toEqual(['For 5A', 'Holiday', 'Staff meeting']);
+  });
+});
+
+// ------------------------------------------------------------------------------------------------ child switching (A2/A3)
+describe('REQ-PAR-SW parent child switching, profile overview and school contact', () => {
+  const linkSibling = async (p: Awaited<ReturnType<typeof seedParent>>, studentId: string) => {
+    const l = await A.owner.post(`/students/${studentId}/guardians`, { name: 'Ravi Rao', phone: '9811111111', relationship: 'father', existingGuardianId: p.guardianId });
+    await A.owner.patch(`/students/${studentId}/guardians/${l.body.data.linkId}`, { verified: true });
+    await A.owner.patch(`/students/${studentId}/guardians/${l.body.data.linkId}`, { portalAccess: true });
+    return l.body.data.linkId as string;
+  };
+
+  it('one child or many: the list contains exactly the linked children, and each child-specific endpoint answers for THAT child only', async () => {
+    const p = await seedParent(app, A, A.studentsA[0]!, 'ravi@parents.test');
+    expect(((await p.client.get('/parent/children')).body.data as unknown[]).length).toBe(1);
+    const sibLink = await linkSibling(p, A.studentsA[1]!);
+    await A.owner.put(`/attendance/sections/${A.sectionA}`, { date: today, entries: [{ studentId: A.studentsA[0], status: 'absent' }, { studentId: A.studentsA[1], status: 'present' }] });
+    const kids = (await p.client.get('/parent/children')).body.data as Array<{ id: string; admissionNo: string }>;
+    expect(kids.map((c) => c.admissionNo).sort()).toEqual(['alpha-A1', 'alpha-A2']);
+    const q = `from=${today}&to=${today}`;
+    for (const [id, adm, status] of [[A.studentsA[0]!, 'alpha-A1', 'absent'], [A.studentsA[1]!, 'alpha-A2', 'present']] as const) {
+      const prof = await p.client.get(`/parent/children/${id}/profile`);
+      expect(prof.status).toBe(200);
+      expect(prof.body.data).toMatchObject({ id, admissionNo: adm, relationship: 'father' });
+      expect((await p.client.get(`/parent/children/${id}/attendance?${q}`)).body.data.records[0].status).toBe(status);
+    }
+    // never leaks other people's contact data
+    expect(Object.keys((await p.client.get(`/parent/children/${A.studentsA[0]}/profile`)).body.data).sort()).toEqual(['admissionDate', 'admissionNo', 'className', 'dob', 'gender', 'id', 'name', 'relationship', 'rollNo', 'sectionName', 'session', 'status']);
+
+    // switching to a child that is not linked (classmate, other school, junk id) is refused on the server, whatever the UI shows
+    for (const id of [A.studentsA[2]!, B.studentsA[0]!, 'not-an-id']) {
+      const r = await p.client.get(`/parent/children/${id}/profile`);
+      expect([400, 404], id).toContain(r.status);
+      expect(JSON.stringify(r.body)).not.toMatch(/Asha3|Bala|bravo/);
+    }
+    // revoking one link removes only that child, immediately
+    await A.owner.patch(`/students/${A.studentsA[1]}/guardians/${sibLink}`, { ended: true });
+    expect((await p.client.get(`/parent/children/${A.studentsA[1]}/profile`)).status).toBe(404);
+    expect((await p.client.get(`/parent/children/${A.studentsA[0]}/profile`)).status).toBe(200);
+    expect(((await p.client.get('/parent/children')).body.data as unknown[]).length).toBe(1);
+  });
+
+  it('profile and school contact are parent-only and respect portal access; staff and students cannot use them', async () => {
+    const p = await seedParent(app, A, A.studentsA[0]!, 'ravi@parents.test');
+    const contact = await p.client.get('/parent/school-contact');
+    expect(contact.status).toBe(200);
+    expect(contact.body.data.name).toBeTruthy();
+    expect(Object.keys(contact.body.data).sort()).toEqual(['address', 'email', 'name', 'phone']); // public contact details only
+    expect((await A.owner.get('/parent/school-contact')).status).toBe(403);
+    expect((await A.owner.get(`/parent/children/${A.studentsA[0]}/profile`)).status).toBe(403);
+    const stu = await seedStudentLogin(app, A, A.studentsA[0]!);
+    expect((await stu.client.get(`/parent/children/${A.studentsA[0]}/profile`)).status).toBe(403);
+    expect((await stu.client.get('/parent/school-contact')).status).toBe(403);
+    await A.owner.patch(`/students/${A.studentsA[0]}/guardians/${p.linkId}`, { portalAccess: false });
+    expect((await p.client.get(`/parent/children/${A.studentsA[0]}/profile`)).status).toBe(404);
+    // another school's parent cannot reach school A's child by id
+    const pb = await seedParent(app, B, B.studentsA[0]!, 'ravi@bravo-parents.test');
+    expect((await pb.client.get(`/parent/children/${A.studentsA[0]}/profile`)).status).toBe(404);
   });
 });

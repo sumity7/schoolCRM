@@ -25,12 +25,19 @@ import { registerParentRoutes } from './modules/parent/parent.routes';
 import { registerExamRoutes } from './modules/exams/exams.routes';
 import { registerPromotionRoutes } from './modules/promotion/promotion.routes';
 import { registerPlatformRoutes } from './modules/platform/platform.routes';
+import { registerStudentPortalRoutes } from './modules/student-portal/student.routes';
+import { registerTimetableRoutes } from './modules/timetable/timetable.routes';
+import { registerHomeworkRoutes } from './modules/homework/homework.routes';
+import { HomeworkService } from './modules/homework/homework.service';
+import { createStorage, type FileStorage } from './core/storage/file-storage';
 
 export interface AppDeps {
   env: Env;
   logger: Logger;
   email: EmailAdapter;
   limiters?: LimiterConfig['overrides'];
+  /** File storage provider (default: local disk under UPLOAD_DIR). Tests may inject an in-memory one. */
+  storage?: FileStorage;
 }
 
 export interface BuiltApp {
@@ -66,6 +73,9 @@ export function createApp(deps: AppDeps): BuiltApp {
 
   // CSV uploads (≤ 2,000 rows) are the only large bodies; every other route keeps the 100 kb cap.
   app.use(`${API_BASE}/imports`, express.json({ limit: '4mb', strict: true, type: 'application/json' }));
+  // Homework uploads travel as base64 JSON (keeps the JSON-only CSRF rule): the two upload routes get a larger cap, sized from UPLOAD_MAX_BYTES.
+  const uploadJson = express.json({ limit: `${Math.ceil((env.UPLOAD_MAX_BYTES * 4) / 3 / 1024) + 16}kb`, strict: true, type: 'application/json' });
+  app.post([`${API_BASE}/homework/files`, `${API_BASE}/student/me/homework/files`], uploadJson);
   app.use(express.json({ limit: '100kb', strict: true, type: 'application/json' }));
   app.use(rejectOperatorKeys);
 
@@ -96,6 +106,9 @@ export function createApp(deps: AppDeps): BuiltApp {
   registerExamRoutes(registrar);
   registerPromotionRoutes(registrar);
   registerPlatformRoutes(registrar, { env, email: deps.email });
+  registerStudentPortalRoutes(registrar);
+  registerTimetableRoutes(registrar);
+  registerHomeworkRoutes(registrar, new HomeworkService({ env, storage: deps.storage ?? createStorage(env) }));
   registerNoticeJobs(deps.email);
 
   app.use(API_BASE, router);

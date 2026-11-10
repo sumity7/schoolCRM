@@ -20,7 +20,10 @@ export interface SchoolSettings {
     halfDayWeight: number;
     lowAttendanceThresholdPct: number;
   };
+  /** What portal users may see (configurable guardian/student access policy). Missing on older schools → defaults. */
+  portalPolicy?: Partial<import('./school.defaults').PortalPolicy>;
 }
+
 
 export interface ISchool {
   _id?: Types.ObjectId;

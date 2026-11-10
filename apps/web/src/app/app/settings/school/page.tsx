@@ -9,7 +9,11 @@ import { Alert, Button, Card, Field, Input, PageHeader, Select, Skeleton } from 
 interface Settings {
   timezone: string; dateFormat: string; workingDays: number[]; academicYearStartMonth: number; themeColor: string; language: string;
   attendancePolicy: { teacherEditWindowDays: number; lateCountsAsPresent: boolean; halfDayWeight: number; lowAttendanceThresholdPct: number };
+  portalPolicy?: Partial<PortalPolicy>;
 }
+interface PortalPolicy { studentsSeeFees: boolean; studentsSeeRank: boolean; parentsSeeFees: boolean; parentsSeeRank: boolean; parentsSeeResults: boolean }
+const PORTAL_DEFAULTS: PortalPolicy = { studentsSeeFees: false, studentsSeeRank: false, parentsSeeFees: true, parentsSeeRank: true, parentsSeeResults: true };
+const PORTAL_LABELS: Array<[keyof PortalPolicy, string]> = [['parentsSeeResults', 'Parents can see results and report cards'], ['parentsSeeRank', 'Parents can see class rank'], ['parentsSeeFees', 'Parents can see fee details and receipts (also needs the per-guardian fee permission)'], ['studentsSeeRank', 'Students can see their class rank'], ['studentsSeeFees', 'Students can see their fee status']];
 interface School { id: string; name: string; code: string; phone?: string; officialEmail?: string; website?: string; address?: { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string }; status: string; settings: Settings; limits: { students: number; staff: number } }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -40,7 +44,7 @@ export default function SchoolSettingsPage() {
     onSuccess: async () => { setSaved('Profile saved'); await qc.invalidateQueries({ queryKey: ['school'] }); await refresh(); },
   });
   const saveSettings = useMutation({
-    mutationFn: async () => patch('/schools/me/settings', { workingDays: s!.workingDays, dateFormat: s!.dateFormat, academicYearStartMonth: s!.academicYearStartMonth, attendancePolicy: s!.attendancePolicy }),
+    mutationFn: async () => patch('/schools/me/settings', { workingDays: s!.workingDays, dateFormat: s!.dateFormat, academicYearStartMonth: s!.academicYearStartMonth, attendancePolicy: s!.attendancePolicy, portalPolicy: { ...PORTAL_DEFAULTS, ...(s!.portalPolicy ?? {}) } }),
     onSuccess: async () => { setSaved('Policies saved'); await qc.invalidateQueries(); },
   });
 
@@ -106,6 +110,14 @@ export default function SchoolSettingsPage() {
             </Field>
             <label className="flex min-h-11 items-center gap-2 self-end text-sm"><input type="checkbox" className="h-5 w-5" disabled={!editable} checked={ap.lateCountsAsPresent} onChange={(e) => setAp('lateCountsAsPresent', e.target.checked)} /> Late counts as present</label>
           </div>
+          <fieldset className="space-y-1 border-t border-border pt-3">
+            <legend className="mb-1 text-sm font-medium">Parent &amp; student portal — what they may see</legend>
+            {PORTAL_LABELS.map(([k, label]) => (
+              <label key={k} className="flex min-h-11 items-center gap-2 text-sm">
+                <input type="checkbox" className="h-5 w-5" disabled={!editable} checked={{ ...PORTAL_DEFAULTS, ...(s.portalPolicy ?? {}) }[k]} onChange={(e) => setS({ ...s, portalPolicy: { ...(s.portalPolicy ?? {}), [k]: e.target.checked } })} data-testid={`policy-${k}`} /> {label}
+              </label>
+            ))}
+          </fieldset>
           {saveSettings.error ? <Alert>{errorText(saveSettings.error)}</Alert> : null}
           {editable ? <Button type="submit" disabled={saveSettings.isPending || s.workingDays.length === 0}>Save policies</Button> : null}
         </form>

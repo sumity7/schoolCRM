@@ -18,7 +18,7 @@ export default function NoticesPage() {
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
   const [compose, setCompose] = useState(false);
-  const isParent = me?.roleKeys.includes('parent');
+  const isParent = me?.roleKeys.includes('parent') || me?.roleKeys.includes('student');
   const createScope = me?.permissions.find((p) => p.key === 'notices:create')?.scope;
   const canPost = can('notices:create') && !isParent;
   const sections = useSections({ enabled: !isParent && can('academics:read') });

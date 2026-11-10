@@ -13,12 +13,32 @@ import { toObjectId } from '../../core/tenancy/repository';
 import { users } from './auth.repository';
 import type { IUser } from '../users/user.model';
 import { registerMfaRoutes } from './mfa.routes';
+import { DEMO_ACCOUNTS, DEMO_PASSWORD } from './demo-accounts';
+import { verifyPassword } from './crypto';
 
 type UserRow = IUser & { _id: Types.ObjectId };
 
 export function registerAuthRoutes(r: Registrar, deps: { env: Env; auth: AuthService; sessions: SessionService }) {
   const { env, auth, sessions: sessionService } = deps;
   registerMfaRoutes(r, { env, sessions: sessionService });
+
+  // Development-only: lists demo accounts that REALLY exist (and whose demo password really works). The route does not
+  // exist at all unless the server flag is on, so production answers 404. It never logs anyone in.
+  if (env.DEMO_LOGIN_ENABLED) {
+    r.define({
+      method: 'get', path: '/auth/demo-accounts', summary: 'DEV ONLY: demo accounts available on the login page', tenancy: 'none', auth: 'public',
+      async handler() {
+        const out = [];
+        for (const d of DEMO_ACCOUNTS) {
+          const u = (await users.findOne({ email: d.identifier }, 'demo: verify account exists')) as (UserRow & { passwordHash?: string }) | null;
+          let ok = Boolean(u && u.status === 'active' && (await verifyPassword(u.passwordHash, DEMO_PASSWORD)));
+          if (ok && u) ok = d.platform ? Boolean(u.platformRole) : (await auth.activeMemberships(u._id)).length > 0;
+          out.push(ok ? { key: d.key, label: d.label, description: d.description, available: true, identifier: d.identifier, password: DEMO_PASSWORD } : { key: d.key, label: d.label, description: d.description, available: false });
+        }
+        return { data: out };
+      },
+    });
+  }
 
   const cookieOpts = (maxAgeMs?: number) => ({
     httpOnly: true,
