@@ -3,6 +3,7 @@ import { createLogger } from './core/logging/logger';
 import { connectDb, disconnectDb, ensureIndexes } from './core/db/connection';
 import { DevEmailAdapter, DisabledEmailAdapter } from './core/notifications/email';
 import { createApp } from './app';
+import { JobQueue } from './core/jobs/job-queue';
 
 async function main() {
   const env = loadEnv();
@@ -13,8 +14,10 @@ async function main() {
   const { app } = createApp({ env, logger, email });
   const server = app.listen(env.PORT, env.HOST, () => logger.info({ host: env.HOST, port: env.PORT, env: env.NODE_ENV, label: env.APP_ENV_LABEL }, 'EduNex API listening'));
 
+  const stopJobs = env.JOBS_ENABLED && env.NODE_ENV !== 'test' ? JobQueue.start(logger) : () => undefined;
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'shutting down');
+    stopJobs();
     server.close(async () => {
       await disconnectDb();
       process.exit(0);

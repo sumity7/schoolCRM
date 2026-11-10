@@ -5,7 +5,7 @@ import { Client, loggedIn, makeTestApp, seedMember, seedSchool, type SeededSchoo
 import { _auditRowsForTest } from '../src/core/audit/audit.service';
 import { memberships, sessions } from '../src/modules/auth/auth.repository';
 import mongoose, { Types } from 'mongoose';
-import { buildFeeData, buildSchoolData, todayIst, type SchoolData } from './helpers/fixtures';
+import { buildExamData, buildFeeData, buildSchoolData, seedParent, todayIst, type SchoolData } from './helpers/fixtures';
 import { modelRegistry } from '../src/core/tenancy/registry';
 import { runAsPlatform } from '../src/core/tenancy/context';
 import { AttendanceCorrectionModel } from '../src/modules/attendance/attendance.model';
@@ -50,6 +50,13 @@ describe('REQ-RBAC route manifest (deny-by-default, doc 06 lock 4)', () => {
       if (m.method !== 'delete') expect(m.hasBody, `${m.method} ${m.path} needs a body schema`).toBe(true);
     }
   });
+  it('own-scope grants (parents, own staff profile) reach only an explicit allow-list of routes', () => {
+    const own = manifest.filter((m) => m.allowOwnScope).map((m) => `${m.method} ${m.path.replace('/api/v1', '')}`).sort();
+    expect(own).toEqual([
+      'get /notices', 'get /notices/:id/stats', 'get /parent/children', 'get /parent/children/:id/attendance', 'get /parent/children/:id/fees',
+      'get /parent/children/:id/payments/:paymentId/receipt.pdf', 'get /parent/children/:id/results', 'get /parent/children/:id/results/:resultId/report-card.pdf', 'get /staff', 'get /staff/:id', 'post /notices', 'post /notices/:id/read', 'post /notices/:id/withdraw',
+    ]);
+  });
   it('only public routes are in the auth namespace and tenant-less', () => {
     for (const m of manifest.filter((x) => x.auth === 'public')) {
       expect(m.tenancy).toBe('none');
@@ -68,7 +75,7 @@ describe('REQ-RBAC route manifest (deny-by-default, doc 06 lock 4)', () => {
 
 describe("REQ-TEN isolation harness v2 — every school route attacked with the other tenant's identity", () => {
   /** Request shapes that pass validation, so the attack reaches the handler and the 404 is the TENANT answer. */
-  const specs = (bd: SchoolData): Record<string, { body?: object; query?: string }> => ({
+  const specs = (bd: SchoolData): Record<string, { body?: object; query?: string; as?: 'parent' }> => ({
     'patch /academics/sessions/:id': { body: { name: 'Hack' } }, 'post /academics/sessions/:id/activate': {}, 'post /academics/sessions/:id/close': {},
     'patch /classes/:id': { body: { name: 'x' } }, 'delete /classes/:id': {}, 'patch /sections/:id': { body: { name: 'x' } }, 'delete /sections/:id': {},
     'delete /subjects/:id': {}, 'delete /academics/teacher-assignments/:id': {}, 'delete /academics/calendar/events/:id': {},
@@ -89,6 +96,18 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
     'get /fees/invoices/:id': {}, 'post /fees/invoices/:id/void': { body: { reason: 'hack attempt' } }, 'post /fees/invoices/:id/late-fee': { body: { amountPaise: 100, reason: 'hack attempt' } },
     'post /fees/invoices/:id/adjust': { body: { amountPaise: -100, reason: 'hack attempt' } }, 'get /fees/students/:id/summary': {},
     'get /fees/payments/:id': {}, 'get /fees/payments/:id/receipt.pdf': {}, 'post /fees/payments/:id/reversal-requests': { body: { reason: 'hack attempt' } },
+    'post /students/:id/guardians/:linkId/portal-invite': { body: {} },
+    'post /notices/:id/read': { body: {} }, 'post /notices/:id/withdraw': { body: {} }, 'get /notices/:id/stats': {},
+    'get /parent/children/:id/attendance': { query: `?from=${todayIst()}&to=${todayIst()}`, as: 'parent' }, 'get /parent/children/:id/fees': { as: 'parent' },
+    'get /parent/children/:id/payments/:paymentId/receipt.pdf': { as: 'parent' },
+    'post /exams/grading-scales/:id/publish': { body: {} }, 'get /exams/:id': {}, 'put /exams/:id/subjects': { body: { subjects: [] } },
+    'post /exams/:id/open-marks': { body: {} }, 'post /exams/:id/lock-marks': { body: {} },
+    'get /exams/:id/marks': { query: `?sectionId=${bd.sectionA}&subjectId=${bd.subjectId}` },
+    'put /exams/:id/marks': { body: { sectionId: bd.sectionA, subjectId: bd.subjectId, entries: [{ studentId: bd.studentsA[0], obtained: 1, status: 'entered' }] } },
+    'post /exams/:id/results/compute': { body: {} }, 'post /exams/:id/results/publish': { body: {} }, 'get /exams/:id/results': { query: `?sectionId=${bd.sectionA}` },
+    'post /exams/:id/results/students/:studentId/correct': { body: { reason: 'hack attempt', marks: [{ subjectId: bd.subjectId, obtained: 1, status: 'entered' }] } },
+    'get /results/:id/report-card.pdf': {},
+    'get /parent/children/:id/results': { as: 'parent' }, 'get /parent/children/:id/results/:resultId/report-card.pdf': { as: 'parent' },
     'post /fees/requests/:id/approve': { body: {} }, 'post /fees/requests/:id/reject': { body: {} }, 'post /fees/requests/:id/mark-paid': { body: { paidOn: todayIst(), mode: 'cash' } },
   });
 
@@ -109,17 +128,20 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
     const bImport = await HB.owner.post('/imports', { entity: 'students', filename: 'b.csv', csv: 'Admission No,Student Name,DOB\nB-9,Secret Kid,01/01/2015' });
     if (bImport.status !== 201) throw new Error(`fixture import: ${bImport.status}`);
     const bFees = await buildFeeData(HB, 'harnb');
+    const bNotice = await HB.owner.post('/notices', { title: 'B only notice', body: 'secret', audience: 'everyone' });
+    const aParent = await seedParent(app, HA, HA.studentsA[0]!, 'harness-parent@harna.test');
+    const bExam = await buildExamData(HB);
     const fx: Record<string, string> = {
-      import: bImport.body.data.id,
+      import: bImport.body.data.id, notice: bNotice.body.data.id, grading_scale: bExam.scaleId, exam: bExam.examId, result: bExam.resultId,
       fee_category: bFees.categoryId, fee_structure: bFees.structureId, concession: bFees.concessionId, invoice: bFees.invoiceId, payment: bFees.paymentId, finance_request: bFees.requestId,
       session: HB.sessionId, class: HB.classId, section: HB.sectionA, subject: HB.subjectId, assignment: HB.assignmentId, event: HB.eventId,
       staff: HB.teacherStaffId, student: HB.studentsA[0]!, guardian_link: HB.guardianLinkId, correction: String(bCorrection._id), membership: String(HB.teacherMembershipId),
     };
-    return { HA, HB, fx, bFees };
+    return { HA, HB, fx, bFees, aParent };
   }
 
   it("every id-bearing route returns 404 for School B ids, and School B's data is byte-for-byte unchanged", async () => {
-    const { HA, HB, fx } = await twoSchools();
+    const { HA, HB, fx, aParent } = await twoSchools();
     const sp = specs(HB);
     const routes = registrar.manifest.filter((m) => m.tenancy === 'school' && m.idParams);
     expect(routes.length).toBeGreaterThan(25);
@@ -133,15 +155,16 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
         if (!kind || !fx[kind]) throw new Error(`Isolation harness has no fixture for resource kind "${kind}" (${key}) — add one`);
         return fx[kind]!;
       });
-      const res = await (HA.owner as unknown as Record<string, (p: string, b?: unknown) => Promise<{ status: number }>>)[m.method]!(`${path}${spec.query ?? ''}`, spec.body ?? {});
+      const caller = spec.as === 'parent' ? aParent.client : HA.owner;
+      const res = await (caller as unknown as Record<string, (p: string, b?: unknown) => Promise<{ status: number }>>)[m.method]!(`${path}${spec.query ?? ''}`, spec.body ?? {});
       expect(res.status, `${key} with a School B id`).toBe(404);
     }
     expect(await snapshotSchool(HB.school.schoolId)).toBe(before);
   });
 
   it("every collection route returns only the caller's own rows (no School B id appears anywhere)", async () => {
-    const { HA, HB, fx } = await twoSchools();
-    const bIds = ['Secret Kid', fx.import!, fx.invoice!, fx.payment!, fx.fee_structure!, HB.sessionId, HB.classId, HB.sectionA, HB.sectionB, HB.subjectId, HB.teacherStaffId, HB.assignmentId, HB.eventId, HB.guardianLinkId, ...HB.studentsA, ...HB.studentsB, String(HB.school.schoolId), String(HB.teacherMembershipId)];
+    const { HA, HB, fx, aParent } = await twoSchools();
+    const bIds = ['Secret Kid', 'B only notice', fx.import!, fx.notice!, fx.exam!, fx.result!, fx.grading_scale!, fx.invoice!, fx.payment!, fx.fee_structure!, HB.sessionId, HB.classId, HB.sectionA, HB.sectionB, HB.subjectId, HB.teacherStaffId, HB.assignmentId, HB.eventId, HB.guardianLinkId, ...HB.studentsA, ...HB.studentsB, String(HB.school.schoolId), String(HB.teacherMembershipId)];
     const routes = registrar.manifest.filter((m) => m.method === 'get' && m.tenancy === 'school' && !m.path.includes(':'));
     const month = `?sectionId=${HA.sectionA}&month=${todayIst().slice(0, 7)}`;
     const range = `?from=2020-01-01&to=${todayIst()}`;
@@ -150,7 +173,9 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
     let checked = 0;
     for (const m of routes) {
       const p = m.path.replace('/api/v1', '');
-      const res = (await HA.owner.get(`${p}${queries[p] ?? ''}`)) as { status: number; body: unknown; text?: string };
+      // parent-portal routes are swept AS A PARENT of school A (staff are refused there before any data is read)
+      const caller = p.startsWith('/parent/') ? aParent.client : HA.owner;
+      const res = (await caller.get(`${p}${queries[p] ?? ''}`)) as { status: number; body: unknown; text?: string };
       if (res.status === 400) continue; // route needs params we did not supply (covered by the id-route attack)
       expect(res.status, p).toBe(200);
       const text = JSON.stringify(res.body) + (res.text ?? '');

@@ -45,6 +45,9 @@ export default function StudentDetailPage() {
   });
   const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ['student'] }), qc.invalidateQueries({ queryKey: ['guardians'] }), qc.invalidateQueries({ queryKey: ['students'] })]);
 
+  const invite = useMutation({
+    mutationFn: async (linkId: string) => (await post<{ email: string }>(`/students/${id}/guardians/${linkId}/portal-invite`, {})).data,
+  });
   const linkUpdate = useMutation({
     mutationFn: async (v: { linkId: string; body: Record<string, boolean> }) => patch(`/students/${id}/guardians/${v.linkId}`, v.body),
     onSuccess: refresh,
@@ -128,6 +131,8 @@ export default function StudentDetailPage() {
             {can('guardians:create') ? <Button size="sm" variant="outline" onClick={() => setGuardianOpen(true)} data-testid="add-guardian">Add guardian</Button> : null}
           </div>
           {linkUpdate.error ? <Alert>{errorText(linkUpdate.error)}</Alert> : null}
+          {invite.error ? <Alert>{errorText(invite.error)}</Alert> : null}
+          {invite.data ? <Alert tone="success">Portal invitation sent to {invite.data.email} (development: written to the outbox).</Alert> : null}
           {guardians.data && guardians.data.length === 0 ? <Alert tone="info">No guardians linked yet.</Alert> : null}
           {guardians.data && guardians.data.length > 0 ? (
             <Table minWidth={640} testId="guardians-table">
@@ -145,6 +150,7 @@ export default function StudentDetailPage() {
                         <div className="flex justify-end gap-1">
                           {!g.verified ? <Button size="sm" variant="ghost" disabled={linkUpdate.isPending} onClick={() => linkUpdate.mutate({ linkId: g.linkId, body: { verified: true } })}>Verify</Button> : null}
                           {g.verified ? <Button size="sm" variant="ghost" disabled={linkUpdate.isPending} onClick={() => linkUpdate.mutate({ linkId: g.linkId, body: { portalAccess: !g.portalAccess } })}>{g.portalAccess ? 'Disable portal' : 'Enable portal'}</Button> : null}
+                          {g.verified && g.portalAccess && g.email ? <Button size="sm" variant="ghost" disabled={invite.isPending} onClick={() => invite.mutate(g.linkId)} data-testid={`invite-${g.linkId}`}>Invite to portal</Button> : null}
                           <Button size="sm" variant="ghost" className="text-danger" disabled={linkUpdate.isPending} onClick={() => { if (window.confirm(`End ${g.name}'s link to this student? Portal access stops immediately.`)) linkUpdate.mutate({ linkId: g.linkId, body: { ended: true } }); }}>End link</Button>
                         </div>
                       ) : null}

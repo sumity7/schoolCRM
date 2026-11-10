@@ -5,10 +5,21 @@ import type { EmailAdapter } from '../../core/notifications/email';
 import type { Registrar } from '../../core/http/route';
 import type { SessionService } from '../auth/session.service';
 import { roleRepository } from '../roles/roles.repository';
+import { ParentPortalService } from './parents.service';
 import { UsersService } from './users.service';
 
 export function registerUserRoutes(r: Registrar, deps: { env: Env; email: EmailAdapter; sessions: SessionService }) {
   const svc = new UsersService(deps);
+  const parents = new ParentPortalService(deps);
+
+  r.define({
+    method: 'post', path: '/students/:id/guardians/:linkId/portal-invite', summary: 'Invite a verified guardian to the parent portal (email)', tenancy: 'school', auth: 'session', permission: 'guardians:update', rateClass: 'sensitive',
+    params: z.object({ id: objectIdSchema, linkId: objectIdSchema }).strict(), idParams: { id: 'student', linkId: 'guardian_link' }, body: z.object({}).strict(),
+    audit: { exempt: 'ParentPortalService records parents.invited' },
+    async handler({ params }) {
+      return { status: 201, data: await parents.invite(params.id, params.linkId) };
+    },
+  });
 
   r.define({
     method: 'get', path: '/users', summary: 'List school members', tenancy: 'school', auth: 'session', permission: 'users:read',

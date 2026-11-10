@@ -37,6 +37,8 @@ const schema = z.object({
   FEATURE_WHATSAPP: bool.default('false'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   RATE_LIMIT_ENABLED: bool.default('true'),
+  /** In-process background worker (notice e-mails …). Tests drain the queue explicitly. */
+  JOBS_ENABLED: bool.default('true'),
 });
 
 export type Env = z.infer<typeof schema>;

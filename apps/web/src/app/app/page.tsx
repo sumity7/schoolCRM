@@ -5,6 +5,7 @@ import { get } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Card, Skeleton } from '@/components/ui/primitives';
 import { inr } from '@/lib/fees';
+import { ParentHome } from '@/components/parent-home';
 
 const todayInIndia = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
@@ -12,6 +13,11 @@ interface Entitlements { limits: { students: number; staff: number } }
 
 /** Real data only: counts come from the API; nothing is fabricated. Charts arrive with reports that have data to show. */
 export default function DashboardPage() {
+  const { me } = useAuth();
+  return me?.roleKeys.includes('parent') ? <ParentHome /> : <StaffDashboard />;
+}
+
+function StaffDashboard() {
   const { me, can } = useAuth();
   const students = useQuery({ queryKey: ['students-count'], enabled: can('students:read'), queryFn: async () => (await get<unknown[]>('/students?limit=1')).meta?.total ?? 0 });
   const ent = useQuery({ queryKey: ['entitlements'], queryFn: async () => (await get<Entitlements>('/schools/me/entitlements')).data });

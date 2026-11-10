@@ -4,3 +4,4 @@ export * from './auth-schemas';
 export * from './attendance';
 export * from './imports';
 export * from './fees';
+export * from './grading';

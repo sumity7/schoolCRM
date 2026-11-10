@@ -133,7 +133,7 @@ test.describe('E2E-08 setup screens & navigation', () => {
     await login(page, 'owner@alpha.test');
     const hrefs = ['/app', '/app/attendance', '/app/attendance/reports', '/app/attendance/corrections', '/app/students', '/app/imports', '/app/staff',
       '/app/settings/academic-sessions', '/app/settings/classes', '/app/settings/calendar', '/app/settings/users', '/app/settings/school', '/app/audit',
-      '/app/fees/collect', '/app/fees/invoices', '/app/fees/payments', '/app/fees/concessions', '/app/fees/approvals', '/app/fees/reports', '/app/fees/setup'];
+      '/app/notices', '/app/exams', '/app/fees/collect', '/app/fees/invoices', '/app/fees/payments', '/app/fees/concessions', '/app/fees/approvals', '/app/fees/reports', '/app/fees/setup'];
     const burger = page.getByRole('button', { name: 'Open menu' });
     if (await burger.isVisible()) await burger.click();
     for (const h of hrefs) await expect(page.locator(`nav a[href="${h}"]`).first(), `nav link ${h}`).toBeAttached();

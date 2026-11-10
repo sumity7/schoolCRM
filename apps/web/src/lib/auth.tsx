@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MeResponse, PermissionKey } from '@edunex/shared';
 import { ApiError, get, post, setActiveMembershipHeader } from './api';
@@ -33,8 +33,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const me = q.data ?? null;
 
+  // If another tab switched school (same session), a background refetch of /auth/me reveals it: reload at once so this
+  // tab never keeps showing (or acting on) the previous school's data. The API's 409 TENANT_CONTEXT_CHANGED is the
+  // server-side guarantee; this is the faster client-side path.
+  const shownMembership = useRef<string | null>(null);
   useEffect(() => {
-    setActiveMembershipHeader(me?.activeMembershipId ?? null);
+    const current = me?.activeMembershipId ?? null;
+    if (shownMembership.current && current && current !== shownMembership.current) {
+      window.location.reload();
+      return;
+    }
+    if (current) shownMembership.current = current;
+    setActiveMembershipHeader(current);
   }, [me?.activeMembershipId]);
 
   const refresh = useCallback(async () => {

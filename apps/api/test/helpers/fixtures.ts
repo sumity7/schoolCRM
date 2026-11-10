@@ -96,3 +96,32 @@ export async function buildFeeData(sd: SchoolData, key = 'fx'): Promise<FeeData>
   const con = must(await o.post('/fees/concessions', { studentId: sd.studentsA[1], kind: 'sibling', valueType: 'flat', value: 10_000, reason: 'fixture sibling' }), 201, 'concession');
   return { categoryId: cat.body.data.id, structureId: st.body.data.id, invoiceId: inv.body.data[0].id, paymentId: pay.body.data.payment.id, requestId: req.body.data.id, concessionId: con.body.data.id };
 }
+
+/** A parent login for an existing guardian link: verifies the link, enables portal access, and creates an ACTIVE
+ * guardian membership (personType guardian, personId = guardian) — the state an accepted invitation produces. */
+export async function seedParent(app: Express, sd: SchoolData, studentId: string, email: string) {
+  const links = must(await sd.owner.get(`/students/${studentId}/guardians`), 200, 'guardians');
+  const link = links.body.data[0] as { linkId: string; guardianId: string };
+  must(await sd.owner.patch(`/students/${studentId}/guardians/${link.linkId}`, { verified: true }), 200, 'verify');
+  must(await sd.owner.patch(`/students/${studentId}/guardians/${link.linkId}`, { portalAccess: true }), 200, 'portal');
+  const pm = await seedMember(sd.school.schoolId, email, ['parent'], { personType: 'guardian', name: 'Parent' });
+  await memberships.updateOne({ _id: pm.membershipId }, { $set: { personId: new Types.ObjectId(link.guardianId) } }, 'test: link parent to guardian');
+  return { client: await loggedIn(app, email), linkId: link.linkId, guardianId: link.guardianId };
+}
+
+export interface ExamData { scaleId: string; examId: string; resultId: string }
+/** Published grading scale, an exam on the fixture class with maths marks for section A, locked and computed. */
+export async function buildExamData(sd: SchoolData): Promise<ExamData> {
+  const o = sd.owner;
+  const { DEFAULT_BANDS } = await import('@edunex/shared');
+  const scale = must(await o.post('/exams/grading-scales', { name: 'Default', bands: DEFAULT_BANDS }), 201, 'scale');
+  must(await o.post(`/exams/grading-scales/${scale.body.data.id}/publish`), 200, 'publish scale');
+  const ex = must(await o.post('/exams', { name: 'Unit test 1', type: 'unit', classIds: [sd.classId], gradingScaleId: scale.body.data.id }), 201, 'exam');
+  must(await o.put(`/exams/${ex.body.data.id}/subjects`, { subjects: [{ classId: sd.classId, subjectId: sd.subjectId, maxMarks: 50, passMarks: 17 }] }), 200, 'subjects');
+  must(await o.post(`/exams/${ex.body.data.id}/open-marks`), 200, 'open');
+  must(await o.put(`/exams/${ex.body.data.id}/marks`, { sectionId: sd.sectionA, subjectId: sd.subjectId, entries: sd.studentsA.map((studentId, i) => ({ studentId, obtained: 40 - i, status: 'entered' })) }), 200, 'marks');
+  must(await o.post(`/exams/${ex.body.data.id}/lock-marks`), 200, 'lock');
+  must(await o.post(`/exams/${ex.body.data.id}/results/compute`), 200, 'compute');
+  const res = must(await o.get(`/exams/${ex.body.data.id}/results?sectionId=${sd.sectionA}`), 200, 'results');
+  return { scaleId: scale.body.data.id, examId: ex.body.data.id, resultId: res.body.data[0].id };
+}

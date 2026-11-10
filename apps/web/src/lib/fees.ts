@@ -37,9 +37,9 @@ export const invoiceTone = (s: Invoice['status']) => (s === 'paid' ? 'success' :
 export const MODE_LABEL: Record<string, string> = { cash: 'Cash', upi: 'UPI', bank_transfer: 'Bank transfer', cheque: 'Cheque', card: 'Card' };
 
 /** Opens a receipt PDF in a new tab via a blob (the API sends no HTML, so the PDF viewer is not affected by page CSP). */
-export async function openReceipt(paymentId: string): Promise<void> {
+export async function openReceipt(paymentId: string, path = `/fees/payments/${paymentId}/receipt.pdf`): Promise<void> {
   const win = window.open('', '_blank');
-  const res = await fetch(`/api/v1/fees/payments/${paymentId}/receipt.pdf`, { credentials: 'same-origin', headers: { 'X-Requested-With': 'edunex' } });
+  const res = await fetch(`/api/v1${path}`, { credentials: 'same-origin', headers: { 'X-Requested-With': 'edunex' } });
   if (!res.ok) {
     win?.close();
     throw new ApiError(res.status, 'INTERNAL', res.status === 403 ? 'You do not have permission to print receipts' : 'Could not load the receipt');

@@ -13,7 +13,7 @@ const dto = (s: Awaited<ReturnType<typeof staffRepo.getById>>) => ({
 
 export function registerStaffRoutes(r: Registrar) {
   r.define({
-    method: 'get', path: '/staff', summary: 'List staff', tenancy: 'school', auth: 'session', permission: 'staff:read',
+    method: 'get', path: '/staff', summary: 'List staff', tenancy: 'school', auth: 'session', permission: 'staff:read', allowOwnScope: true,
     query: paginationQuerySchema.extend({ kind: z.enum(['teaching', 'non_teaching']).optional(), status: z.enum(['active', 'on_leave', 'resigned', 'terminated']).optional() }).strict(),
     async handler({ query, scope, tenant }) {
       const filter: Record<string, unknown> = {};
@@ -38,7 +38,7 @@ export function registerStaffRoutes(r: Registrar) {
   });
 
   r.define({
-    method: 'get', path: '/staff/:id', summary: 'Staff profile', tenancy: 'school', auth: 'session', permission: 'staff:read',
+    method: 'get', path: '/staff/:id', summary: 'Staff profile', tenancy: 'school', auth: 'session', permission: 'staff:read', allowOwnScope: true,
     params: idParam, idParams: { id: 'staff' },
     async handler({ params, scope, tenant }) {
       if (scope === 'own' && String(tenant.personId) !== params.id) throw notFound('Staff member'); // own profile only

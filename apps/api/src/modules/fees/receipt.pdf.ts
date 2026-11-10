@@ -1,5 +1,4 @@
-import { join, resolve } from 'node:path';
-import pdfmake from 'pdfmake';
+import { pdfText, renderPdf } from '../../core/pdf/pdf';
 import { amountInWords, formatINR } from '@edunex/shared';
 
 /**
@@ -7,35 +6,7 @@ import { amountInWords, formatINR } from '@edunex/shared';
  * split into script runs: Devanagari → Noto Sans Devanagari, everything else → Noto Sans. Fonts are vendored under
  * apps/api/assets/fonts (SIL OFL 1.1); FONTS_DIR overrides the location. No network access is ever allowed.
  */
-const FONTS = resolve(process.env.FONTS_DIR ?? join(process.cwd(), 'assets', 'fonts'));
-let configured = false;
-function configure() {
-  if (configured) return;
-  pdfmake.setFonts({
-    Latin: { normal: join(FONTS, 'NotoSans-Regular.ttf'), bold: join(FONTS, 'NotoSans-Bold.ttf') },
-    Deva: { normal: join(FONTS, 'NotoSansDevanagari-Regular.ttf'), bold: join(FONTS, 'NotoSansDevanagari-Bold.ttf') },
-  });
-  pdfmake.setLocalAccessPolicy((p) => resolve(p).startsWith(FONTS));
-  pdfmake.setUrlAccessPolicy(() => false);
-  configured = true;
-}
-
-/** Devanagari, Devanagari Extended, Vedic Extensions, ZWNJ/ZWJ (conjunct control) and the rupee sign. */
-function isDeva(ch: string): boolean {
-  const c = ch.codePointAt(0)!;
-  return (c >= 0x0900 && c <= 0x097f) || (c >= 0xa8e0 && c <= 0xa8ff) || (c >= 0x1cd0 && c <= 0x1cff) || c === 0x200c || c === 0x200d || c === 0x20b9;
-}
-export function scriptRuns(text: string, extra: Record<string, unknown> = {}) {
-  const out: Array<{ text: string; font: string } & Record<string, unknown>> = [];
-  for (const ch of text) {
-    const prev = out[out.length - 1];
-    const font = isDeva(ch) ? 'Deva' : /\s/.test(ch) && prev ? prev.font : 'Latin';
-    if (prev && prev.font === font) prev.text += ch;
-    else out.push({ text: ch, font, ...extra });
-  }
-  return out.length ? out : [{ text: '', font: 'Latin', ...extra }];
-}
-const t = (s: string, extra: Record<string, unknown> = {}) => ({ text: scriptRuns(s), ...extra });
+const t = pdfText;
 const ddmmyyyy = (d: string) => d.split('-').reverse().join('/');
 
 export interface ReceiptData {
@@ -52,7 +23,6 @@ export interface ReceiptData {
 }
 
 export async function renderReceipt(r: ReceiptData): Promise<Buffer> {
-  configure();
   const cancelled = r.status === 'reversed';
   const doc = {
     pageSize: 'A5',
@@ -91,9 +61,9 @@ export async function renderReceipt(r: ReceiptData): Promise<Buffer> {
         },
         layout: 'lightHorizontalLines',
       },
-      { text: amountInWords(r.amountPaise), italics: false, margin: [0, 8, 0, 0] },
+      { text: amountInWords(r.amountPaise), margin: [0, 8, 0, 0] },
       { columns: [{ text: '' }, { stack: [t(`Received by: ${r.receivedByName}`), { text: 'Signature: ____________________', margin: [0, 14, 0, 0] }], width: 'auto' }], margin: [0, 18, 0, 0] },
     ],
   };
-  return pdfmake.createPdf(doc as never).getBuffer();
+  return renderPdf(doc);
 }

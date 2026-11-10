@@ -35,12 +35,14 @@ await ensureIndexes();
 const { app } = createApp({ env, logger: createLogger('warn'), email: new DevEmailAdapter(undefined, null) });
 
 // Seed through the real API (same rules as users).
-const { buildSchoolData } = await import('../test/helpers/fixtures');
+const { buildSchoolData, seedParent } = await import('../test/helpers/fixtures');
 const { seedMember } = await import('../test/helpers/app');
 const alpha = await buildSchoolData(app, 'alpha');
 const bravo = await buildSchoolData(app, 'bravo');
 await seedMember(alpha.school.schoolId, 'multi@x.test', ['admin'], { name: 'Multi Admin' });
 await seedMember(bravo.school.schoolId, 'multi@x.test', ['admin'], { name: 'Multi Admin' });
+// Parent of alpha-A1 (Ravi Rao): verified link, portal on, active guardian login — what an accepted invitation produces.
+await seedParent(app, alpha, alpha.studentsA[0]!, 'parent@alpha.test');
 
 app.listen(env.PORT, () => console.log(`E2E API ready on ${env.PORT} (synthetic data seeded)`));
 process.on('SIGTERM', async () => { await rs.stop(); process.exit(0); });
