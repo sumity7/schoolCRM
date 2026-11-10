@@ -27,6 +27,7 @@ import { registerPromotionRoutes } from './modules/promotion/promotion.routes';
 import { registerPlatformRoutes } from './modules/platform/platform.routes';
 import { registerStudentPortalRoutes } from './modules/student-portal/student.routes';
 import { registerTimetableRoutes } from './modules/timetable/timetable.routes';
+import { registerSchoolCalendarRoutes } from './modules/student-portal/school-calendar';
 import { registerHomeworkRoutes } from './modules/homework/homework.routes';
 import { HomeworkService } from './modules/homework/homework.service';
 import { createStorage, type FileStorage } from './core/storage/file-storage';
@@ -108,6 +109,7 @@ export function createApp(deps: AppDeps): BuiltApp {
   registerPlatformRoutes(registrar, { env, email: deps.email });
   registerStudentPortalRoutes(registrar);
   registerTimetableRoutes(registrar);
+  registerSchoolCalendarRoutes(registrar);
   registerHomeworkRoutes(registrar, new HomeworkService({ env, storage: deps.storage ?? createStorage(env) }));
   registerNoticeJobs(deps.email);
 

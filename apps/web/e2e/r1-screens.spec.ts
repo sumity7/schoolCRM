@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { openMenuIfMobile } from './env';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -17,8 +18,7 @@ async function login(page: Page, email: string) {
 }
 
 async function navTo(page: Page, name: string) {
-  const burger = page.getByRole('button', { name: 'Open menu' });
-  if (await burger.isVisible()) await burger.click();
+  await openMenuIfMobile(page);
   await page.getByRole('link', { name, exact: true }).first().click();
 }
 
@@ -70,8 +70,7 @@ test.describe('E2E-06 student import wizard', () => {
 
   test('a teacher has no import screen and the API refuses the upload', async ({ page }) => {
     await login(page, 'tina@alpha.test');
-    const burger = page.getByRole('button', { name: 'Open menu' });
-    if (await burger.isVisible()) await burger.click();
+    await openMenuIfMobile(page);
     await expect(page.getByRole('link', { name: 'Imports', exact: true })).toHaveCount(0);
     const status = await page.evaluate(async () => (await fetch('/api/v1/imports', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'edunex' }, body: JSON.stringify({ entity: 'students', filename: 'x.csv', csv: 'a\n1' }) })).status);
     expect(status).toBe(403);
@@ -134,8 +133,7 @@ test.describe('E2E-08 setup screens & navigation', () => {
     const hrefs = ['/app', '/app/attendance', '/app/attendance/reports', '/app/attendance/corrections', '/app/students', '/app/imports', '/app/staff',
       '/app/settings/academic-sessions', '/app/settings/classes', '/app/settings/calendar', '/app/settings/users', '/app/settings/school', '/app/audit',
       '/app/notices', '/app/exams', '/app/settings/promotion', '/app/fees/collect', '/app/fees/invoices', '/app/fees/payments', '/app/fees/concessions', '/app/fees/approvals', '/app/fees/reports', '/app/fees/setup'];
-    const burger = page.getByRole('button', { name: 'Open menu' });
-    if (await burger.isVisible()) await burger.click();
+    await openMenuIfMobile(page);
     for (const h of hrefs) await expect(page.locator(`nav a[href="${h}"]`).first(), `nav link ${h}`).toBeAttached();
     hrefs.push('/app/security'); // header link, not in the sidebar
     for (const h of hrefs) {
@@ -149,8 +147,7 @@ test.describe('E2E-08 setup screens & navigation', () => {
 
   test('teacher sees only teaching screens', async ({ page }) => {
     await login(page, 'tina@alpha.test');
-    const burger = page.getByRole('button', { name: 'Open menu' });
-    if (await burger.isVisible()) await burger.click();
+    await openMenuIfMobile(page);
     const nav = page.getByRole('navigation', { name: 'Main' }).last();
     await expect(nav.getByRole('link', { name: 'Attendance', exact: true })).toBeVisible();
     for (const hidden of ['Imports', 'Staff', 'Academic sessions', 'Classes & sections', 'Users & roles', 'School settings', 'Audit log', 'Corrections']) {

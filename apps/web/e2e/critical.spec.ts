@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { WEB_ORIGIN } from './env';
+import { WEB_ORIGIN, openMenuIfMobile } from './env';
 
 /**
  * Mandatory critical browser flows (docs/phase-0/11 §2.1). API tests do NOT replace these.
@@ -19,8 +19,7 @@ async function login(page: Page, email: string) {
 
 /** Navigate via the sidebar; on phones the sidebar lives behind the hamburger menu. */
 async function navTo(page: Page, name: string) {
-  const burger = page.getByRole('button', { name: 'Open menu' });
-  if (await burger.isVisible()) await burger.click();
+  await openMenuIfMobile(page);
   await page.getByRole('link', { name, exact: true }).first().click();
 }
 

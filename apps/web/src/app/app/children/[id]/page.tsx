@@ -13,6 +13,7 @@ import { AttendanceCalendar } from '@/components/attendance-calendar';
 import { markCell, resultTone, type ResultRow } from '@/lib/exams';
 import { cn } from '@/lib/utils';
 import { OwnTimetable } from '@/components/own-timetable';
+import { SchoolCalendar } from '@/components/school-calendar';
 import { HomeworkCards } from '@/components/homework-list';
 import type { Homework } from '@/lib/homework';
 import { Alert, Badge, Button, Card, PageHeader, Skeleton } from '@/components/ui/primitives';
@@ -26,7 +27,7 @@ const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' 
 const daysAgo = (n: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(Date.now() - n * 86_400_000));
 
 /** The only tab values the page accepts from the URL. Anything else (or a tab the child's access does not include) falls back to attendance. */
-const CHILD_TABS = ['attendance', 'results', 'fees', 'timetable', 'homework', 'profile'] as const;
+const CHILD_TABS = ['attendance', 'results', 'fees', 'timetable', 'homework', 'calendar', 'profile'] as const;
 type Tab = (typeof CHILD_TABS)[number];
 const isTab = (v: string | null): v is Tab => v !== null && (CHILD_TABS as readonly string[]).includes(v);
 
@@ -85,6 +86,7 @@ function ChildView() {
       {tab === 'attendance' ? <AttendanceCalendar basePath={`/parent/children/${id}/attendance`} testId="child-calendar" /> : null}
 
       {tab === 'timetable' ? <div data-testid="child-timetable"><OwnTimetable key={id} path={`/parent/children/${id}/timetable`} show="teacher" testId="child-timetable-grid" /></div> : null}
+      {tab === 'calendar' ? <SchoolCalendar key={id} path={`/parent/children/${id}/calendar`} testId="child-calendar" /> : null}
       {tab === 'homework' ? (
         homework.isLoading ? <Skeleton className="h-32" /> : homework.error ? <Alert>{errorText(homework.error)}</Alert> : (
           <div data-testid="child-homework"><HomeworkCards items={homework.data ?? []} empty="No homework has been set for this class yet." /></div>

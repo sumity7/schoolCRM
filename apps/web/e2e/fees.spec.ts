@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { WEB_ORIGIN } from './env';
+import { WEB_ORIGIN, openMenuIfMobile } from './env';
 
 /** E2E-09 fee desk (doc 11 §2.1 "later releases add their own critical flows (e.g. R2 fee collection)"). Synthetic data; re-runnable. */
 const PASSWORD = 'Correct-Horse-9';
@@ -102,8 +102,7 @@ test.describe('E2E-09 fee desk', () => {
 
   test('fee screens are hidden from teachers and refused by the API', async ({ page }) => {
     await login(page, 'tina@alpha.test');
-    const burger = page.getByRole('button', { name: 'Open menu' });
-    if (await burger.isVisible()) await burger.click();
+    await openMenuIfMobile(page);
     await expect(page.getByRole('link', { name: 'Collect fee', exact: true })).toHaveCount(0);
     const res = await page.request.get(`${WEB}/api/v1/fees/invoices`, { headers: { 'X-Requested-With': 'edunex' } });
     expect(res.status()).toBe(403);

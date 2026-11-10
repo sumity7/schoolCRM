@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { WEB_ORIGIN } from './env';
+import { WEB_ORIGIN, openMenuIfMobile } from './env';
 
 /** E2E-10 parent portal + notices (R3). Synthetic data; re-runnable (notice titles are run-unique). */
 const PASSWORD = 'Correct-Horse-9';
@@ -40,9 +40,7 @@ test.describe('E2E-10 parent portal & notices', () => {
     await page.getByTestId('child-alpha-A1').click();
     await expect(page.getByRole('heading', { name: 'Asha1 Rao' })).toBeVisible();
     await expect(page.getByTestId('child-attendance-pct')).toBeVisible();
-
-    const burger = page.getByRole('button', { name: 'Open menu' });
-    if (await burger.isVisible()) await burger.click();
+    await openMenuIfMobile(page);
     for (const hidden of ['Students', 'Attendance', 'Collect fee', 'Audit log']) await expect(page.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
     await page.getByRole('link', { name: 'Notices', exact: true }).click();
     const notice = page.getByRole('button', { name: new RegExp(`Sports day ${r}`) });

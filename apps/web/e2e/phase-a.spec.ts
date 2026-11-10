@@ -56,6 +56,9 @@ test.describe('E2E-14 student activation journey', () => {
     // staff areas are closed to them
     expect((await stu.request.get('/api/v1/students', { headers: HDR })).status()).toBe(403);
     expect((await stu.request.get('/api/v1/parent/children', { headers: HDR })).status()).toBe(403);
+    await stu.goto('/app/calendar');
+    await expect(stu.getByTestId('school-calendar')).toBeVisible(); // own class exam schedule + holidays
+    expect(await noHorizontalScroll(stu)).toBe(true);
     await ctx.close();
 
     // the same link is single-use
@@ -110,6 +113,17 @@ test.describe('E2E-15 parent child switching', () => {
     expect((await page.request.get(`/api/v1/parent/children/${stranger}/profile`, { headers: HDR })).status()).toBe(404);
     await page.goto(`/app/children/${stranger}`);
     await expect(page.getByText('Child not found.')).toBeVisible();
+  });
+
+  test('calendar: the parent sees the child’s exam schedule and school holidays (tab kept in the URL); not another child’s', async ({ page }) => {
+    await login(page, 'parent@alpha.test');
+    await page.getByTestId('child-alpha-A1').click();
+    await page.getByRole('tab', { name: 'calendar' }).click();
+    await expect(page.getByTestId('child-calendar')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Exam schedule' })).toBeVisible();
+    await expect(page).toHaveURL(/\?tab=calendar$/);
+    expect(await noHorizontalScroll(page)).toBe(true);
+    expect((await page.request.get('/api/v1/parent/children/0123456789abcdef01234567/calendar', { headers: HDR })).status()).toBe(404);
   });
 
   test('a parent with a single child gets no switcher', async ({ page }) => {

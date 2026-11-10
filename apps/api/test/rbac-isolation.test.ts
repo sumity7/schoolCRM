@@ -58,7 +58,7 @@ describe('REQ-RBAC route manifest (deny-by-default, doc 06 lock 4)', () => {
       // student from the session (currentStudent); file download is authorised per file; /timetable/me is staff-only.
       'get /parent/children/:id/profile', 'get /parent/school-contact', 'get /parent/children/:id/timetable', 'get /parent/children/:id/homework',
       'get /student/me/timetable', 'get /student/me/homework', 'get /student/me/homework/:id', 'put /student/me/homework/:id/submission', 'post /student/me/homework/files',
-      'get /homework/files/:id', 'get /timetable/me',
+      'get /homework/files/:id', 'get /timetable/me', 'get /student/me/calendar', 'get /parent/children/:id/calendar',
       'get /student/me', 'get /student/me/attendance', 'get /student/me/fees', 'get /student/me/history', 'get /student/me/results', 'get /student/me/results/:resultId/report-card.pdf', 'get /parent/children/:id/attendance', 'get /parent/children/:id/fees',
       'get /parent/children/:id/payments/:paymentId/receipt.pdf', 'get /parent/children/:id/results', 'get /parent/children/:id/results/:resultId/report-card.pdf', 'get /staff', 'get /staff/:id', 'post /notices', 'post /notices/:id/read', 'post /notices/:id/withdraw',
     ].sort());
@@ -116,7 +116,7 @@ describe("REQ-TEN isolation harness v2 — every school route attacked with the 
     'get /parent/children/:id/results': { as: 'parent' }, 'get /parent/children/:id/results/:resultId/report-card.pdf': { as: 'parent' },
     'get /students/:id/portal-access': {}, 'post /students/:id/portal-access': { body: {} }, 'post /students/:id/portal-access/disable': { body: {} }, 'post /students/:id/portal-access/enable': { body: {} },
     'get /student/me/results/:resultId/report-card.pdf': { as: 'student' },
-    'get /parent/children/:id/profile': { as: 'parent' }, 'get /parent/children/:id/timetable': { as: 'parent' }, 'get /parent/children/:id/homework': { as: 'parent' },
+    'get /parent/children/:id/calendar': { as: 'parent' }, 'get /parent/children/:id/profile': { as: 'parent' }, 'get /parent/children/:id/timetable': { as: 'parent' }, 'get /parent/children/:id/homework': { as: 'parent' },
     'get /timetable/versions/:versionId': {}, 'patch /timetable/versions/:versionId': { body: { name: 'hack attempt' } }, 'post /timetable/versions/:versionId/clone': { body: {} },
     'post /timetable/versions/:versionId/publish': { body: {} }, 'get /timetable/versions/:versionId/availability': { query: '?day=1&periodNo=1' },
     'put /timetable/versions/:versionId/lessons': { body: { sectionId: bd.sectionA, day: 1, periodNo: 1, subjectId: bd.subjectId, staffId: bd.teacherStaffId } },

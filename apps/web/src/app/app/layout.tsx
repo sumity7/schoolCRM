@@ -28,7 +28,7 @@ const PARENT_NAV: Array<{ group?: string; items: NavItem[] }> = [
 
 /** Students get their own minimal menu; every route behind it is own-record only. */
 const STUDENT_NAV: Array<{ group?: string; items: NavItem[] }> = [
-  { items: [{ href: '/app', label: 'Dashboard', icon: LayoutDashboard }, { href: '/app/me', label: 'My records', icon: BookUser }, { href: '/app/timetable', label: 'Timetable', icon: CalendarClock }, { href: '/app/homework', label: 'Homework', icon: BookOpenCheck }, { href: '/app/notices', label: 'Notices', icon: Megaphone }] },
+  { items: [{ href: '/app', label: 'Dashboard', icon: LayoutDashboard }, { href: '/app/me', label: 'My records', icon: BookUser }, { href: '/app/timetable', label: 'Timetable', icon: CalendarClock }, { href: '/app/homework', label: 'Homework', icon: BookOpenCheck }, { href: '/app/calendar', label: 'Calendar', icon: CalendarDays }, { href: '/app/notices', label: 'Notices', icon: Megaphone }] },
 ];
 
 const NAV: Array<{ group?: string; items: NavItem[] }> = [
