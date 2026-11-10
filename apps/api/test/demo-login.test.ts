@@ -24,6 +24,13 @@ describe('REQ-DEMO login-page demo accounts (development only)', () => {
     expect(loadEnv({ ...base, NODE_ENV: 'production' } as NodeJS.ProcessEnv).DEMO_LOGIN_ENABLED).toBe(false);
     expect(() => loadEnv({ ...base, NODE_ENV: 'production', DEMO_LOGIN_ENABLED: 'true' } as NodeJS.ProcessEnv)).toThrow(/DEMO_LOGIN_ENABLED/);
     expect(() => loadEnv({ ...base, NODE_ENV: 'staging', DEMO_LOGIN_ENABLED: '1' } as NodeJS.ProcessEnv)).toThrow(/DEMO_LOGIN_ENABLED/);
+    // a PUBLIC DEMO deployment must opt in explicitly with DEPLOYMENT_MODE=demo — and even then the flag stays off unless set
+    expect(loadEnv({ ...base, NODE_ENV: 'production', DEPLOYMENT_MODE: 'demo', DEMO_LOGIN_ENABLED: 'true' } as NodeJS.ProcessEnv).DEMO_LOGIN_ENABLED).toBe(true);
+    expect(loadEnv({ ...base, NODE_ENV: 'production', DEPLOYMENT_MODE: 'demo' } as NodeJS.ProcessEnv).DEMO_LOGIN_ENABLED).toBe(false);
+    expect(() => loadEnv({ ...base, NODE_ENV: 'production', DEPLOYMENT_MODE: 'standard', DEMO_LOGIN_ENABLED: 'true' } as NodeJS.ProcessEnv)).toThrow(/DEMO_LOGIN_ENABLED/);
+    expect(() => loadEnv({ ...base, NODE_ENV: 'production', DEPLOYMENT_MODE: 'anything', DEMO_LOGIN_ENABLED: 'true' } as NodeJS.ProcessEnv)).toThrow();
+    // the demo mode never relaxes the other production guards
+    expect(() => loadEnv({ ...base, COOKIE_SECURE: 'false', NODE_ENV: 'production', DEPLOYMENT_MODE: 'demo', DEMO_LOGIN_ENABLED: 'true' } as NodeJS.ProcessEnv)).toThrow(/COOKIE_SECURE/);
   });
 
   it('when the flag is off the route does not exist (404) and nothing about demo accounts is revealed', async () => {
