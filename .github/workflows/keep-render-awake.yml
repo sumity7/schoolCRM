@@ -1,0 +1,30 @@
+# Keeps the Render free-tier API from sleeping (it sleeps after ~15 min idle; the next request then takes 30–60 s).
+# Pings the cheap liveness endpoint every 10 minutes. Set the repository VARIABLE `RENDER_API_URL`
+# (Settings → Secrets and variables → Actions → Variables), e.g. https://your-api.onrender.com — no trailing slash.
+# Note: GitHub may delay scheduled runs by a few minutes at busy times, and pauses schedules on repos with no activity for 60 days.
+name: Keep Render API awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /health/live
+        env:
+          API_URL: ${{ vars.RENDER_API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then echo "RENDER_API_URL repository variable is not set — skipping"; exit 0; fi
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$API_URL/health/live" || true)
+            echo "attempt $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "API did not answer 200"; exit 1
