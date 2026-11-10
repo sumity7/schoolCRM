@@ -10,7 +10,7 @@ npx vitest run
 Tests use one in-memory MongoDB **replica set** (real transactions) with one database per test file. Synthetic data only.
 Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8.3.4 (local), Vitest 3.2.7.
 
-## Latest run — checkpoint 4 (2026-11-09, session 2)
+## Latest run — checkpoint 6 (2026-11-10, session 2)
 
 | Suite | File | Tests | Result |
 |---|---|---|---|
@@ -22,7 +22,8 @@ Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8
 | R1 domain: academics, students, guardians, attendance (scope, dates, corrections, percentages, concurrency) | `test/r1-domain.test.ts` | 25 | **25 passed** |
 | Lint canaries (the architecture rules actually fire) | `test/lint-rules.test.ts` | 4 | **4 passed** |
 | Import/export: CSV parser + formula-injection sanitiser, date parsing, mapping; 1,000-row/30-bad acceptance, re-import duplicates, class/section/roll/capacity/plan-limit validation, sibling guardian reuse, idempotent commit, rollback of untouched rows only, transaction-join proof, RBAC; student + attendance CSV exports (audited, re-importable) | `test/imports.test.ts` | 17 | **17 passed** |
-| **Total** | 8 files | **135** | **135 passed, 0 failed, 0 skipped** |
+| Backups & tenant portability: encrypted archive round trip with digest verification, wrong passphrase / tampering / truncation write nothing, short passphrase refused, existing file never overwritten, restore drill, GFS retention, export → purge (guards, other school byte-identical, sessions die) → restore → password reset | `test/backup.test.ts` | 6 | **6 passed** |
+| **Total** | 9 files | **141** | **141 passed, 0 failed, 0 skipped** |
 
 Static checks at the same commit: `tsc --noEmit` (strict) clean; `eslint apps packages --max-warnings 0` clean.
 
@@ -47,6 +48,21 @@ MongoDB replica set + the real API (`apps/api/scripts/e2e-server.ts`, synthetic 
 
 Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a real phone have not been run; the Next.js *development* server was used (production-topology proxy of ADR-2 not yet exercised); Screen coverage is functional, not visual; accessibility has not been audited with a screen reader.
 
+## Backup/restore rehearsal (real CLI, checkpoint 6)
+`npx tsx scripts/backup-rehearsal.ts` — throw-away replica set (MongoDB 8.3.4 binary), 2 synthetic schools × 80 students seeded via the API,
+every step run as a separate `scripts/cli.ts` process. Run of 2026-11-10: **PASS**.
+
+| Step | Time |
+|---|---|
+| backup (whole DB, encrypted) | 2.0 s |
+| restore-drill (22 collections, 564 docs, digests + sanity checks) | 4.6 s (restore part 3.2 s) |
+| restore into a new DB; second restore into the same DB refused | 4.4 s |
+| export-school alpha (279 docs) | 1.5 s |
+| purge refused while not deactivated → deactivate → purge | 2.4 s |
+| restore-school alpha (2 users recreated, must reset password) | 2.9 s |
+
+Limits: tiny synthetic dataset on a local machine; not yet run on a production host or with off-site storage (needs hosting).
+
 ## Defects found by the tests and fixed (not hidden)
 1. `PlatformRepository.updateOne/updateMany/count/deleteMany/aggregate` returned lazy Mongoose queries that executed **after** the `runAsPlatform` scope ended → the tenancy plugin correctly failed closed ("Tenant context missing"). Fixed by awaiting inside the scope. (Demonstrates lock 3 fail-closed behaviour.)
 2. Argon2 test parameters violated the library minimum (`timeCost ≥ 2`) → fixed.
@@ -61,8 +77,12 @@ Limits of this evidence: Edge (Chromium engine) only — WebKit/Firefox and a re
 8. (E2E) The import page overflowed horizontally at 360 px (grid items with truncated text need `min-width: 0`) → fixed.
 9. (E2E) Two test-side issues: a non-exact link name that became ambiguous once "Attendance reports" was added; a new test that created a class in the school the attendance tests count sections of → moved to the other school.
 
+10. (backup tests) When the target backup file already existed, the failure-cleanup path deleted the EXISTING file → the file is now opened exclusively before anything else and only files this run created are cleaned up.
+11. (backup tests) Writing through a raw fd taken from a `FileHandle` let garbage collection close it mid-write → the handle's own stream is used.
+12. (rehearsal #1) The rehearsal harness used `spawnSync`, blocking the event loop that drains the in-memory mongod's log pipe; mongod stalled and the run hung during the drill → async spawn with a per-step timeout. Six processes of that hung run could not be stopped from this session (permission policy) and are listed in PROGRESS.md.
+
 ## Not yet covered (tracked in PROGRESS.md)
 - E2E on WebKit/Firefox and real devices; E2E against the production-style reverse-proxy topology.
 - Tests for modules not yet built (fees, exams, portals, …). Import UI is not yet E2E-tested.
 - Background job queue tests (R3), PDF Hindi rendering spike (R2).
-- Performance, restore drill, tenant export/purge/restore round-trip (Phase 7).
+- Performance test with a realistic dataset; restore drill on the real host with off-site storage (Phase 7).

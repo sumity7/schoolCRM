@@ -22,5 +22,12 @@ The system is **not safe for live school data**. The Production-Readiness Gate (
 - Guardians are re-used when phone AND name match (case-insensitive); a guardian with the same phone but a differently spelled name becomes a new guardian record.
 - Student CSV export is capped at 20,000 rows per request; exports include only the first active guardian.
 
+## Backups & data portability (checkpoint 6)
+- Backups, restore drills and school export/purge/restore are **CLI operator tools**; nothing is scheduled automatically yet (cron/systemd unit is part of the deployment work). No off-site copy is configured (needs a provider — D-28).
+- Restore drills so far ran only on a local machine with synthetic data; the Gate G2 drill on the real host is still required.
+- School owners cannot download their own full data export from the app (student/attendance CSVs exist); a full export is produced by the operator on request.
+- Purging a school does not remove it from older backups until they age out of retention (≤ 6 months).
+- Restored user accounts have no password (credentials are never exported); people use "Forgot password", which needs working email — dev outbox only today.
+
 ## Environment
 - Tests use `mongodb-memory-server` (downloads ~590 MB of `mongod` on first run). Pinned `MONGOMS_VERSION` must match the production MongoDB major version once hosting is chosen.
