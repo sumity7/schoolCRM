@@ -51,6 +51,11 @@ const schema = z.object({
 
   /** Login-page demo accounts (development only). */
   DEMO_LOGIN_ENABLED: bool.optional(),
+  /**
+   * 'demo' marks a PUBLIC DEMO deployment (synthetic data only, its own database). Only then may DEMO_LOGIN_ENABLED be
+   * true outside development. 'standard' (default) is every real deployment — demo login stays impossible there.
+   */
+  DEPLOYMENT_MODE: z.enum(['standard', 'demo']).default('standard'),
 
   /** Uploaded files are stored outside publicly served directories. */
   UPLOAD_DIR: z.string().optional(),
@@ -105,8 +110,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     }
   }
 
-  if (env.DEMO_LOGIN_ENABLED && (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging')) {
-    throw new Error('DEMO_LOGIN_ENABLED must not be true in production or staging');
+  if (env.DEMO_LOGIN_ENABLED && (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') && env.DEPLOYMENT_MODE !== 'demo') {
+    throw new Error('DEMO_LOGIN_ENABLED must not be true in production or staging (only a DEPLOYMENT_MODE=demo deployment may enable it)');
   }
 
   // Server-controlled: never derived from the client.

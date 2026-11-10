@@ -14,7 +14,7 @@ import { DEMO_PASSWORD } from '../src/modules/auth/demo-accounts';
 import { ensureDemoAccounts } from './lib/demo-seed';
 
 const env = loadEnv();
-if (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') throw new Error('seed:demo refuses to run outside development');
+if ((env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') && env.DEPLOYMENT_MODE !== 'demo') throw new Error('seed:demo refuses to run outside development (except on a DEPLOYMENT_MODE=demo deployment)');
 await connectDb(env.DATABASE_URL);
 try {
   await ensureIndexes();

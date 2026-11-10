@@ -19,9 +19,10 @@ const ICONS: Record<string, LucideIcon> = { super_admin: ShieldCheck, school_adm
 type Props = { selectedKey: string | null; onPick: (a: DemoAccount) => void; onClear: () => void };
 
 export function DemoAccounts(props: Props) {
-  // NODE_ENV is a build-time constant: in a production build this branch (and DemoAccountsDev, its endpoint path and its
-  // copy) is dead code and is removed from the bundle entirely.
-  if (process.env.NODE_ENV === 'production') return null;
+  // Both values are build-time constants. In a normal production build this branch (and DemoAccountsDev, its endpoint
+  // path and its copy) is dead code and is removed from the bundle entirely. Only a build made for a PUBLIC DEMO
+  // deployment (NEXT_PUBLIC_DEMO_MODE=true) keeps it — and even then the API decides what is listed.
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') return null;
   return <DemoAccountsDev {...props} />;
 }
 
