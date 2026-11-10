@@ -62,6 +62,7 @@ export class AuthService {
       ip: meta.ip,
       userAgent: meta.userAgent,
       activeMembershipId: auto ? (auto.membershipObjectId as Types.ObjectId) : null,
+      mfaPending: Boolean(user.mfa?.enabledAt),
     });
     await AuditService.record({ action: 'auth.login', entityType: 'user', entityId: user._id, actorUserId: user._id, schoolId: auto ? (auto.schoolObjectId as Types.ObjectId) : null });
     const me = await this.buildMe(user, created.session);
@@ -87,6 +88,11 @@ export class AuthService {
   }
 
   async buildMe(user: UserRow, session: SessionRow): Promise<MeResponse> {
+    const mfa = { enabled: Boolean(user.mfa?.enabledAt), pending: Boolean((session as { mfaPending?: boolean }).mfaPending) };
+    if (mfa.pending) {
+      // nothing about schools is revealed before the second factor
+      return { user: { id: String(user._id), name: user.name }, activeMembershipId: null, school: null, roleKeys: [], permissions: [], memberships: [], platformRole: null, mfa };
+    }
     const list = await this.activeMemberships(user._id);
     const resolved = await resolveTenantContext(user, session.activeMembershipId);
     return {
@@ -96,6 +102,8 @@ export class AuthService {
       roleKeys: resolved?.tenant.roleKeys ?? [],
       permissions: resolved ? [...resolved.tenant.grants.entries()].map(([key, scope]: [PermissionKey, string]) => ({ key, scope })) : [],
       memberships: list.map(({ membershipObjectId: _m, schoolObjectId: _s, ...rest }) => rest),
+      platformRole: user.platformRole ?? null,
+      mfa,
     };
   }
 

@@ -45,6 +45,8 @@ export interface RouteSpec<TN extends Tenancy, P extends ZodTypeAny, Q extends Z
   alsoRequire?: PermissionKey[];
   /** Routes that serve OWN-scope grants (parents, a teacher's own staff profile). Everything else refuses `own` scope (deny-by-default). */
   allowOwnScope?: boolean;
+  /** Routes usable while the two-factor code is still outstanding (me, logout, MFA verify). */
+  allowMfaPending?: boolean;
   /** Platform routes: allowed platform roles (default super_admin). */
   platformRoles?: Array<'super_admin' | 'support'>;
   entitlement?: string;
@@ -167,6 +169,7 @@ export function createRegistrar(deps: RegistrarDeps): Registrar {
           const auth = req.auth;
           if (spec.auth === 'session' || spec.tenancy !== 'none') {
             if (!auth) throw unauthenticated();
+            if (auth.session.mfaPending && !spec.allowMfaPending) throw unauthenticated('Enter the code from your authenticator app to finish signing in');
           }
 
           // 3. Tenancy + authorization
@@ -174,6 +177,7 @@ export function createRegistrar(deps: RegistrarDeps): Registrar {
           if (spec.tenancy === 'platform') {
             const allowed = spec.platformRoles ?? ['super_admin'];
             if (!auth!.user.platformRole || !allowed.includes(auth!.user.platformRole)) throw forbidden();
+            if (!auth!.user.mfaEnabled) throw forbidden('Set up two-factor authentication (Security page) before using the platform console');
           } else if (spec.tenancy === 'school') {
             const tenant = auth!.tenant;
             if (!tenant) throw forbidden('No active school selected');

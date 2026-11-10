@@ -23,6 +23,8 @@ import { registerNoticeRoutes } from './modules/notices/notices.routes';
 import { registerNoticeJobs } from './modules/notices/notices.service';
 import { registerParentRoutes } from './modules/parent/parent.routes';
 import { registerExamRoutes } from './modules/exams/exams.routes';
+import { registerPromotionRoutes } from './modules/promotion/promotion.routes';
+import { registerPlatformRoutes } from './modules/platform/platform.routes';
 
 export interface AppDeps {
   env: Env;
@@ -92,6 +94,8 @@ export function createApp(deps: AppDeps): BuiltApp {
   registerNoticeRoutes(registrar);
   registerParentRoutes(registrar);
   registerExamRoutes(registrar);
+  registerPromotionRoutes(registrar);
+  registerPlatformRoutes(registrar, { env, email: deps.email });
   registerNoticeJobs(deps.email);
 
   app.use(API_BASE, router);

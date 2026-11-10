@@ -47,4 +47,8 @@ export interface MeResponse {
   /** For UI hints only — the server re-checks every request. */
   permissions: Array<{ key: string; scope: string }>;
   memberships: MembershipSummary[];
+  /** Platform staff role (Super Admin console). */
+  platformRole?: 'super_admin' | 'support' | null;
+  /** Two-factor state: `pending` = password accepted, code still required for this session. */
+  mfa: { enabled: boolean; pending: boolean };
 }

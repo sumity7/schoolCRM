@@ -34,10 +34,11 @@ export function attachAuth(env: Env, sessionService: SessionService): RequestHan
       const user = (await users.findById(session.userId, 'auth: load session user')) as (IUser & { _id: import('mongoose').Types.ObjectId }) | null;
       if (!user || user.status !== 'active') return next();
 
-      const resolved = await resolveTenantContext(user, session.activeMembershipId);
+      const mfaPending = Boolean((session as { mfaPending?: boolean }).mfaPending);
+      const resolved = mfaPending ? null : await resolveTenantContext(user, session.activeMembershipId);
       const auth: AuthContext = {
-        user: { _id: user._id, name: user.name, email: user.email, phone: user.phone, passwordHash: user.passwordHash, platformRole: user.platformRole, status: user.status },
-        session: { _id: session._id, userId: session.userId, activeMembershipId: session.activeMembershipId, rememberMe: session.rememberMe },
+        user: { _id: user._id, name: user.name, email: user.email, phone: user.phone, passwordHash: user.passwordHash, platformRole: user.platformRole, status: user.status, mfaEnabled: Boolean(user.mfa?.enabledAt) },
+        session: { _id: session._id, userId: session.userId, activeMembershipId: session.activeMembershipId, rememberMe: session.rememberMe, mfaPending },
         tenant: resolved?.tenant,
         school: resolved ? { _id: resolved.school._id, name: resolved.school.name, code: resolved.school.code, status: resolved.school.status, settings: resolved.school.settings as never, limits: resolved.school.limits } : undefined,
       };

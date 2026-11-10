@@ -39,6 +39,8 @@ const schema = z.object({
   RATE_LIMIT_ENABLED: bool.default('true'),
   /** In-process background worker (notice e-mails …). Tests drain the queue explicitly. */
   JOBS_ENABLED: bool.default('true'),
+  /** Encrypts TOTP secrets at rest. MUST be set to a long random value in production. */
+  MFA_ENCRYPTION_KEY: z.string().min(16).default('dev-only-mfa-key-not-for-production'),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -56,6 +58,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       throw new Error('DATABASE_URL points at localhost in production');
     }
     if (!env.APP_BASE_URL.startsWith('https://')) throw new Error('APP_BASE_URL must be https:// in production');
+    if (env.MFA_ENCRYPTION_KEY.startsWith('dev-only') || env.MFA_ENCRYPTION_KEY.length < 32) throw new Error('MFA_ENCRYPTION_KEY must be a random value of at least 32 characters in production');
     if (env.ALLOWED_ORIGINS.some((o) => !o.startsWith('https://'))) throw new Error('ALLOWED_ORIGINS must all be https:// in production');
     if (env.TRUST_PROXY_HOPS < 1) throw new Error('TRUST_PROXY_HOPS must be ≥ 1 in production (the API runs behind the reverse proxy)');
     if (env.FEATURE_ONLINE_PAYMENTS || env.FEATURE_SMS || env.FEATURE_WHATSAPP) {

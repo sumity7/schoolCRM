@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { dayStringSchema, objectIdSchema } from '@edunex/shared';
 import type { Registrar } from '../../core/http/route';
 import { AcademicsService } from './academics.service';
+import { PromotionService } from '../promotion/promotion.service';
 import { assignmentRepo, calendarRepo, classRepo, sectionRepo, sessionRepo, subjectRepo } from './academics.repository';
 import { enrollmentRepo } from '../students/students.repository';
 
@@ -37,7 +38,9 @@ export function registerAcademicsRoutes(r: Registrar) {
     method: 'post', path: '/academics/sessions/:id/activate', summary: 'Activate a session (one active at a time)', tenancy: 'school', auth: 'session', permission: 'academics:approve',
     params: idParam, idParams: { id: 'session' }, body: z.object({}).strict(), audit: { exempt: 'AcademicsService records academics.session_activated' },
     async handler({ params }) {
-      return { data: sessionDto(await AcademicsService.activateSession(params.id)) };
+      const s = await AcademicsService.activateSession(params.id);
+      const { finalized } = await PromotionService.finalize(s._id); // year-end promotions take effect now
+      return { data: { ...sessionDto(s), promotionsApplied: finalized } };
     },
   });
   r.define({

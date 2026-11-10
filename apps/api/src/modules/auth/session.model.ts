@@ -13,6 +13,8 @@ export interface ISession {
   expiresAt: Date;
   revokedAt?: Date | null;
   supportGrantId?: Types.ObjectId;
+  /** Password accepted but the two-factor code is still outstanding: only the MFA routes work. */
+  mfaPending?: boolean;
 }
 
 /** Server-side sessions (ADR-1). Only SHA-256(token) is stored. */
@@ -28,6 +30,7 @@ export const SessionModel = definePlatformModel<ISession>(
     lastSeenAt: { type: Date, required: true },
     expiresAt: { type: Date, required: true },
     revokedAt: { type: Date, default: null },
+    mfaPending: { type: Boolean, default: false },
     supportGrantId: { type: 'ObjectId' },
   },
   (s) => {

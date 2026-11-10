@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BadgeCheck, Baby, BarChart3, Megaphone, NotebookPen, Building2, Coins, FileText, Percent, Receipt, Wallet, Wrench, CalendarCheck, CalendarDays, ClipboardCheck, GraduationCap, History, Layers, LayoutDashboard, LogOut, Menu, Moon, Sun, Upload, UserCog, Users, X } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, Baby, ShieldCheck, BarChart3, Megaphone, NotebookPen, Building2, Coins, FileText, Percent, Receipt, Wallet, Wrench, CalendarCheck, CalendarDays, ClipboardCheck, GraduationCap, History, Layers, LayoutDashboard, LogOut, Menu, Moon, Sun, Upload, UserCog, Users, X } from 'lucide-react';
 import type { PermissionKey, Scope } from '@edunex/shared';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -58,6 +58,7 @@ const NAV: Array<{ group?: string; items: NavItem[] }> = [
       { href: '/app/settings/academic-sessions', label: 'Academic sessions', icon: CalendarDays, perm: 'academics:create' },
       { href: '/app/settings/classes', label: 'Classes & sections', icon: Layers, perm: 'academics:create' },
       { href: '/app/settings/calendar', label: 'Holidays & events', icon: CalendarDays, perm: 'academics:create' },
+      { href: '/app/settings/promotion', label: 'Year-end promotion', icon: ArrowUpRight, perm: 'academics:approve' },
       { href: '/app/settings/users', label: 'Users & roles', icon: UserCog, perm: 'users:read' },
       { href: '/app/settings/school', label: 'School settings', icon: Building2, perm: 'school.settings:update' },
       { href: '/app/audit', label: 'Audit log', icon: History, perm: 'audit:read' },
@@ -72,8 +73,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    if (!me) window.location.assign('/login');
-    else if (!me.activeMembershipId) window.location.assign('/select-school');
+    if (!me || me.mfa?.pending) window.location.assign('/login');
+    else if (!me.activeMembershipId) window.location.assign(me.platformRole && me.memberships.length === 0 ? '/platform' : '/select-school');
   }, [loading, me]);
 
   useEffect(() => {
@@ -162,6 +163,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {me.memberships.length > 1 ? (
             <Link href="/select-school" className="min-h-11 rounded-lg px-3 py-2.5 text-sm hover:bg-muted" data-testid="switch-school">Switch school</Link>
           ) : null}
+          <Link href="/app/security" aria-label="Security" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-muted" data-testid="security-link"><ShieldCheck className="h-4 w-4" /></Link>
           <button aria-label="Toggle theme" onClick={toggleTheme} className="min-h-11 min-w-11 rounded-lg hover:bg-muted">{dark ? <Sun className="mx-auto h-4 w-4" /> : <Moon className="mx-auto h-4 w-4" />}</button>
           <button aria-label="Sign out" onClick={logout} data-testid="logout" className="min-h-11 min-w-11 rounded-lg hover:bg-muted"><LogOut className="mx-auto h-4 w-4" /></button>
         </header>

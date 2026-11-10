@@ -17,7 +17,7 @@ export type ImportBatchStatus = (typeof IMPORT_BATCH_STATUSES)[number];
 export const IMPORT_ROW_STATUSES = ['ok', 'duplicate', 'error', 'created'] as const;
 export type ImportRowStatus = (typeof IMPORT_ROW_STATUSES)[number];
 
-export interface ImportFieldDef {
+export interface ImportFieldDef { 
   key: string;
   label: string;
   /** Required unless an alternative (`orKey`) is mapped. */

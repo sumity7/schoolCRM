@@ -42,5 +42,13 @@ The system is **not safe for live school data**. The Production-Readiness Gate (
 - Collection/outstanding are the only fee reports; class-wise/category-wise/discount reports are not built.
 - Fee policy defaults (D-06…D-09) were chosen by the build agent from doc 14's proposals; schools can change prefix, concession limits and advance handling at Fee setup → Policy.
 
+## R3–R5 (checkpoint 9)
+- E-mail is still the development outbox: notice e-mails and parent invitations are written to `.data/mail`, not delivered (no provider — D-28). Parents without an e-mail address cannot be invited (no SMS).
+- Notice e-mail sending is at-least-once: if the worker crashes between sending and recording, one address may get a duplicate.
+- Result corrections give the corrected student a rank against the other students' current results; other students' published ranks are not recomputed.
+- Grading: one scale per exam, no weighted terms/aggregation across exams, no co-scholastic grades (D-15 sample card still needed).
+- Promotion: no carry-forward invoice for old dues (dues stay visible on the student's account); roll numbers are not assigned in the new year.
+- Platform console: no billing/subscriptions, no break-glass support access, no MFA recovery codes (a lost authenticator needs an operator reset).
+
 ## Environment
 - Tests use `mongodb-memory-server` (downloads ~590 MB of `mongod` on first run). Pinned `MONGOMS_VERSION` must match the production MongoDB major version once hosting is chosen.

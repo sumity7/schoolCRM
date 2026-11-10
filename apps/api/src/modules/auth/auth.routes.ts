@@ -12,11 +12,13 @@ import { sessions } from './auth.repository';
 import { toObjectId } from '../../core/tenancy/repository';
 import { users } from './auth.repository';
 import type { IUser } from '../users/user.model';
+import { registerMfaRoutes } from './mfa.routes';
 
 type UserRow = IUser & { _id: Types.ObjectId };
 
 export function registerAuthRoutes(r: Registrar, deps: { env: Env; auth: AuthService; sessions: SessionService }) {
   const { env, auth, sessions: sessionService } = deps;
+  registerMfaRoutes(r, { env, sessions: sessionService });
 
   const cookieOpts = (maxAgeMs?: number) => ({
     httpOnly: true,
@@ -45,7 +47,7 @@ export function registerAuthRoutes(r: Registrar, deps: { env: Env; auth: AuthSer
   });
 
   r.define({
-    method: 'post', path: '/auth/logout', summary: 'Log out (revokes this session)', tenancy: 'none', auth: 'session',
+    method: 'post', path: '/auth/logout', summary: 'Log out (revokes this session)', tenancy: 'none', auth: 'session', allowMfaPending: true,
     body: z.object({}).strict(), audit: { exempt: 'AuthService records auth.logout' },
     async handler({ auth: a, res }) {
       await auth.logout(null, { _id: a!.session._id } as never);
@@ -65,7 +67,7 @@ export function registerAuthRoutes(r: Registrar, deps: { env: Env; auth: AuthSer
   });
 
   r.define({
-    method: 'get', path: '/auth/me', summary: 'Current user, active school, permissions (UI hints only), memberships', tenancy: 'none', auth: 'session',
+    method: 'get', path: '/auth/me', summary: 'Current user, active school, permissions (UI hints only), memberships', tenancy: 'none', auth: 'session', allowMfaPending: true,
     async handler({ req }) {
       const user = await currentUser(req);
       const sessionRow = (await sessions.findById(req.auth!.session._id, 'auth: me session')) as never;

@@ -10,7 +10,7 @@ npx vitest run
 Tests use one in-memory MongoDB **replica set** (real transactions) with one database per test file. Synthetic data only.
 Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8.3.4 (local), Vitest 3.2.7.
 
-## Latest run — checkpoint 8 (2026-11-10, session 2)
+## Latest run — checkpoint 9 (2026-11-10, session 2)
 
 | Suite | File | Tests | Result |
 |---|---|---|---|
@@ -24,7 +24,11 @@ Environment of the runs below: Windows 11, Node 22.17.1, MongoDB server binary 8
 | Import/export: CSV parser + formula-injection sanitiser, date parsing, mapping; 1,000-row/30-bad acceptance, re-import duplicates, class/section/roll/capacity/plan-limit validation, sibling guardian reuse, idempotent commit, rollback of untouched rows only, transaction-join proof, RBAC; student + attendance CSV exports (audited, re-importable) | `test/imports.test.ts` | 17 | **17 passed** |
 | Backups & tenant portability: encrypted archive round trip with digest verification, wrong passphrase / tampering / truncation write nothing, short passphrase refused, existing file never overwritten, restore drill, GFS retention, export → purge (guards, other school byte-identical, sessions die) → restore → password reset | `test/backup.test.ts` | 6 | **6 passed** |
 | Fees (R2): money arithmetic + allocation property test; structures/versions; idempotent billing; concessions & limits; payments/advance/receipt numbering; 30-way concurrency; receipt PDF; reversals/refunds/separation of duties; day close; ledger invariant property test over random operations; reports | `test/fees.test.ts` | 18 | **18 passed** |
-| **Total** | 10 files | **161** | **161 passed, 0 failed, 0 skipped** |
+| R3: job queue (retry/backoff/dead-letter/de-dup/lease recovery), parent invitation + portal, link-based access re-checked per request, siblings, receipts, notices (audiences, e-mail dedup + idempotency, read receipts, teacher limits) | `test/parents-notices.test.ts` | 6 | **6 passed** |
+| R4: grading rules (boundaries, incomplete/absent/exempt, ranking, determinism); exam workflow with scoped marks entry, immutability, versioned correction, parent report card | `test/exams.test.ts` | 5 | **5 passed** |
+| R5: year-end promotion (all-or-nothing, replace decisions, old year byte-identical, finalize on activation) | `test/promotion.test.ts` | 1 | **1 passed** |
+| R5: TOTP (RFC 6238 vectors, encrypted secrets), two-step sign-in, platform console (MFA required, support read-only, suspend/reactivate, counts only, audit) | `test/platform-mfa.test.ts` | 4 | **4 passed** |
+| **Total** | 14 files | **178** | **178 passed, 0 failed, 0 skipped** |
 
 Static checks at the same commit: `tsc --noEmit` (strict) clean; `eslint apps packages --max-warnings 0` clean.
 
@@ -45,6 +49,9 @@ MongoDB replica set + the real API (`apps/api/scripts/e2e-server.ts`, synthetic 
 | E2E-06 | Import wizard: upload CSV → columns auto-matched → check → problem row shown with reason → import 2 → students searchable → undo removes them; teacher has no Imports link and the API answers 403 | pass | pass |
 | E2E-07 | Add student → add guardian → portal blocked until verified → verify → enable portal → edit twice (no stale-version error) → export CSV download (BOM, re-importable headers) | pass | pass |
 | E2E-08 | Every one of the 13 owner sidebar screens loads with no error alert and no horizontal scroll; teacher sees no setup/admin links; owner creates class + section (capacity shown) and a holiday | pass | pass |
+| E2E-10 | Parent portal: owner posts a section notice → parent sees only their child, attendance, the notice (read receipt stored); staff screens absent and `/students` answers 403 | pass | pass |
+| E2E-11 | Exams: grading scale → exam → subjects → teacher enters marks for her section only → owner completes, locks, computes, publishes → parent sees the result and downloads the report card | pass | pass |
+| E2E-12 | Platform console: password → wrong code rejected → correct code → real counts, no student data → create school → audit entry; school staff refused | pass | pass |
 | E2E-09 | Fee desk: bill an instalment from the Invoices screen → collect a part-payment (confirmation shows allocation) → receipt number format → receipt PDF bytes via the proxy → balance drops by exactly the amount → reversal request; requester gets no Approve button; teachers see no fee screens and the API answers 403 | pass | pass |
 | **Total** | 15 specs × 2 projects | **30 passed** | |
 
@@ -93,6 +100,15 @@ every step run as a separate `scripts/cli.ts` process. Run of 2026-11-10: **PASS
 | restore-school alpha (2 users recreated, must reset password) | 2.9 s |
 
 Limits: tiny synthetic dataset on a local machine; not yet run on a production host or with off-site storage (needs hosting).
+
+Checkpoint-9 browser evidence, stated precisely: 40 tests (20 specs × 2 viewports). One full run was cut short when the dev web server on :3100 died mid-run (the exams test then hung 14 min and later tests failed in milliseconds — an environment failure, no product error). Everything before that point passed (34 results incl. all of E2E-01…E2E-06, E2E-09, E2E-10, E2E-12 on both viewports); the exams, import, student-record and screen-sweep specs were re-run afterwards on both viewports: 14/14 passed. **No single uninterrupted 40/40 run exists.** `PW_REUSE_SERVERS=1` was added so a run can reuse servers left by an earlier run (default stays strict).
+
+## Defects found while building R3–R5 (not hidden)
+20. (R3) A parent could reach a staff report (low-attendance) because `attendance:read` is granted at `own` scope and the route accepted any scope → **own-scope is now denied on every route unless the route opts in**; a manifest test pins the exact allow-list.
+21. (R3 E2E) After another tab switched school, the first tab only noticed on its next API call → the tab now reloads as soon as `/auth/me` shows a different school (E2E-03 failed once in 32 full-suite runs on desktop and passed 3/3 repeats; the cause was not proven, this change removes the timing window).
+22. (R4) Report-card PDF used an italic font face that is not vendored → 500; italic removed (bold used instead).
+23. (R5 test) A screen-sweep entry listed the Security page as a sidebar link; it is a header link → test fixed.
+24. (R5 E2E) A full run immediately after `next build` in the same `.next` folder failed 4 tests (webpack cache errors in the log); the two product tests passed when re-run alone. Builds and the E2E dev server must not share `.next` at the same time.
 
 ## Defects found by the tests and fixed (not hidden)
 1. `PlatformRepository.updateOne/updateMany/count/deleteMany/aggregate` returned lazy Mongoose queries that executed **after** the `runAsPlatform` scope ended → the tenancy plugin correctly failed closed ("Tenant context missing"). Fixed by awaiting inside the scope. (Demonstrates lock 3 fail-closed behaviour.)

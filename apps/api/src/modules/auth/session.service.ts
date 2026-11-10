@@ -21,7 +21,7 @@ const TOUCH_INTERVAL_MS = 60_000;
 export class SessionService {
   constructor(private readonly policy: SessionPolicy) {}
 
-  async create(opts: { userId: Types.ObjectId; rememberMe: boolean; ip?: string; userAgent?: string; activeMembershipId?: Types.ObjectId | null }) {
+  async create(opts: { userId: Types.ObjectId; rememberMe: boolean; ip?: string; userAgent?: string; activeMembershipId?: Types.ObjectId | null; mfaPending?: boolean }) {
     const token = newToken();
     const now = new Date();
     const days = opts.rememberMe ? this.policy.rememberDays : this.policy.absoluteDays;
@@ -31,6 +31,7 @@ export class SessionService {
         tokenHash: hashToken(token),
         activeMembershipId: opts.activeMembershipId ?? null,
         rememberMe: opts.rememberMe,
+        mfaPending: Boolean(opts.mfaPending),
         ip: opts.ip,
         userAgent: opts.userAgent?.slice(0, 300),
         lastSeenAt: now,
@@ -39,6 +40,10 @@ export class SessionService {
       'auth: create session',
     );
     return { token, session: row as SessionRow, maxAgeMs: days * 86_400_000 };
+  }
+
+  async completeMfa(sessionId: Types.ObjectId): Promise<void> {
+    await sessions.updateOne({ _id: sessionId }, { $set: { mfaPending: false } }, 'auth: mfa completed');
   }
 
   /** Returns the live session for a cookie token, or null (unknown/revoked/expired/idle-timeout). */

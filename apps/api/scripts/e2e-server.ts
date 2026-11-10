@@ -43,6 +43,14 @@ await seedMember(alpha.school.schoolId, 'multi@x.test', ['admin'], { name: 'Mult
 await seedMember(bravo.school.schoolId, 'multi@x.test', ['admin'], { name: 'Multi Admin' });
 // Parent of alpha-A1 (Ravi Rao): verified link, portal on, active guardian login — what an accepted invitation produces.
 await seedParent(app, alpha, alpha.studentsA[0]!, 'parent@alpha.test');
+// Platform Super Admin with two-factor ON and a KNOWN test secret (E2E computes real TOTP codes from it). Synthetic.
+{
+  const { createSuperAdmin } = await import('../src/modules/schools/schools.service');
+  const { encryptSecret } = await import('../src/modules/auth/totp');
+  const { users } = await import('../src/modules/auth/auth.repository');
+  const u = await createSuperAdmin({ email: 'root@edunex.test', name: 'Root Admin', password: 'Correct-Horse-9' });
+  await users.updateOne({ _id: u._id }, { $set: { mfa: { type: 'totp', secretEnc: encryptSecret('JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', env.MFA_ENCRYPTION_KEY), enabledAt: new Date() } } }, 'e2e: mfa');
+}
 
 app.listen(env.PORT, () => console.log(`E2E API ready on ${env.PORT} (synthetic data seeded)`));
 process.on('SIGTERM', async () => { await rs.stop(); process.exit(0); });

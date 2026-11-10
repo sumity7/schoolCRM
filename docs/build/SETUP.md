@@ -25,6 +25,9 @@ npm run cli --workspace @edunex/api -- create-school --code demo --name "Demo Sc
 The owner invitation link is printed and also written to `apps/api/.data/mail/` (dev outbox — no real email is sent).
 Use **synthetic data only**; never load real student data into a development machine.
 
+### Platform console
+After `create-super-admin`, sign in at `/login`: you land on `/platform`, which first asks you to turn on two-factor authentication (enter the shown key in an authenticator app). From then on every sign-in asks for the 6-digit code. Schools can then be created from the console instead of the CLI.
+
 ### Notes
 - `npm run seed:demo` creates a synthetic school: `owner@demo.test` / `tina@demo.test`, password `Correct-Horse-9`.
 - Set `DEV_DB_PATH` to put the dev database somewhere else (e.g. if `apps/api/.data/mongo` was left broken by an interrupted first start).

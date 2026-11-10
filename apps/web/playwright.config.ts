@@ -3,6 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 const WEB = 'http://localhost:3100';
 // Optional: drive an installed browser (e.g. PW_CHANNEL=msedge or chrome) instead of downloading Playwright's Chromium.
 const channel = process.env.PW_CHANNEL || undefined;
+// Opt-in: reuse servers left running by an earlier run (default is strict, so CI always starts clean).
+const reuse = process.env.PW_REUSE_SERVERS === '1';
 
 export default defineConfig({
   testDir: './e2e',
@@ -23,16 +25,16 @@ export default defineConfig({
       command: 'npm run e2e:api --workspace @edunex/api',
       url: 'http://localhost:4100/health/ready',
       timeout: 180_000,
-      reuseExistingServer: false,
+      reuseExistingServer: reuse,
       env: { E2E_WEB_ORIGIN: WEB, MONGOMS_SYSTEM_BINARY: process.env.MONGOMS_SYSTEM_BINARY ?? '', MONGOMS_SYSTEM_BINARY_VERSION_CHECK: 'false' },
     },
     {
       command: 'npx next dev -p 3100',
       url: `${WEB}/login`,
       timeout: 180_000,
-      reuseExistingServer: false,
+      reuseExistingServer: reuse,
       env: { API_ORIGIN: 'http://127.0.0.1:4100' },
     },
-    { command: 'node e2e/attacker-server.mjs', url: 'http://localhost:3200/', timeout: 30_000, reuseExistingServer: false, env: { E2E_WEB_ORIGIN: WEB } },
+    { command: 'node e2e/attacker-server.mjs', url: 'http://localhost:3200/', timeout: 30_000, reuseExistingServer: reuse, env: { E2E_WEB_ORIGIN: WEB } },
   ],
 });

@@ -3,7 +3,7 @@
 > **Resume rule:** read this file first. Continue from "NEXT ACTION". Do not re-ask decisions listed in DECISION-LOG.md.
 > Honest status vocabulary: `NOT STARTED` · `IN PROGRESS` · `CODE WRITTEN (untested)` · `TESTED` (tests actually executed and passing, with counts in TEST-REPORT.md) · `DEFERRED`.
 
-Last updated: 2026-11-10 (session 2, checkpoint 8)
+Last updated: 2026-11-10 (session 2, checkpoint 9)
 
 ## Release map
 
@@ -11,9 +11,9 @@ Last updated: 2026-11-10 (session 2, checkpoint 8)
 |---|---|---|
 | R1 | Student management & attendance foundation | **TESTED** locally; go-live gate needs hosting (D-26/D-28) |
 | R2 | Fees & financial management | **TESTED** (API + UI + E2E); real-money parallel run (Gate G8) NOT DONE |
-| R3 | Parent portal & communication | NOT STARTED |
-| R4 | Exams & academic management | NOT STARTED |
-| R5 | Promotion & Super Admin console | NOT STARTED |
+| R3 | Parent portal & communication | **TESTED** (API + UI + E2E-10) |
+| R4 | Exams & academic management | **TESTED** (API + UI + E2E-11) |
+| R5 | Promotion & Super Admin console | **TESTED** (API + UI + E2E-12; promotion UI covered by API test + screen sweep) |
 
 ## R1 phase checklist
 
@@ -46,9 +46,21 @@ Last updated: 2026-11-10 (session 2, checkpoint 8)
 | Fee screens: collect, invoices, payments, concessions, approvals, reports + day close, setup | **TESTED** (E2E-09 + screen sweep, desktop + 360 px) |
 | Not built: online payments (D-28: flag off), automatic late fees (D-08 default manual), cheque-bounce charges, fee carry-forward at session rollover (with R5 promotion), parent fee view (R3) | — |
 
+## R3–R5 checklist (checkpoint 9)
+| Item | Status |
+|---|---|
+| ADR-5 job queue re-evaluated → Mongo queue kept (lease, backoff, dead-letter, de-dup, idempotent handlers) | **TESTED** |
+| Notices: audiences, teacher limits, read receipts, withdraw, stats, idempotent deduplicated parent e-mail | **TESTED** |
+| Parent portal (D-03 default: e-mail invitation for verified guardians): children, attendance, fees, receipts, results, report cards | **TESTED** (incl. acceptance scenario 2) |
+| Own-scope deny-by-default in the registrar + manifest allow-list | **TESTED** |
+| Exams: versioned grading scales, exams, subjects, scoped marks entry, deterministic results/ranks, publish immutability, versioned corrections, report card PDF | **TESTED** (incl. acceptance scenarios 3 & 4, grade boundaries) |
+| Year-end promotion: prepare, preview, commit, finalize on activation | **TESTED** (acceptance scenario 7) |
+| Platform console + mandatory TOTP MFA for platform staff; Security page (password, devices, MFA) for everyone | **TESTED** |
+| Not built: SMS/WhatsApp (D-28), student logins (D-16), break-glass support access (D-22), platform billing/subscriptions, timetable/homework/library/transport (P1 modules), co-scholastic grades, MFA recovery codes | — |
+
 ## NEXT ACTION
 1. R1 remaining: (a) ~~web screens~~ done at checkpoint 5 (still missing, lower priority: own profile/password/sessions page, onboarding checklist); (b) ~~CSV import/export~~ done; (c) ~~backups/tenant tools~~ done at checkpoint 6; (d) ~~deployment docs, perf test, security review~~ done at checkpoint 7 (real-host steps need hosting); (e) `docs/build` remaining files (ARCHITECTURE, SETUP, ENVIRONMENT, DEPLOYMENT, SECURITY-REPORT, MASTER-IMPLEMENTATION-PLAN, traceability matrix).
-2. ~~R2 Fees & ledger~~ done at checkpoint 8. Next: R3 (re-evaluate job queue first, ADR-5; decide parent login D-03 default), then R4 exams, R5 promotion + Super Admin console.
+2. ~~R2–R5~~ done at checkpoint 9 (MVP feature scope of doc 15). Remaining work is go-live work that needs your decisions/spending (hosting, domain, email provider, legal review, pilot) and P1 modules (timetable, homework, library, transport, admissions pipeline).
 3. Never mark a release done without its acceptance tests (docs/phase-0/11).
 
 ## Housekeeping for the user

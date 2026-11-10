@@ -15,7 +15,8 @@ export interface IUser {
   lockedUntil?: Date | null;
   lastLoginAt?: Date;
   platformRole?: PlatformRole;
-  mfa?: { type: 'totp'; secretEnc: string; enabledAt: Date };
+  mfa?: { type: 'totp'; secretEnc: string; enabledAt: Date } | null;
+  mfaPendingSecretEnc?: string | null;
   _id?: Types.ObjectId;
 }
 
@@ -33,7 +34,8 @@ export const UserModel = definePlatformModel<IUser>(
     lockedUntil: { type: Date, default: null },
     lastLoginAt: { type: Date },
     platformRole: { type: String, enum: ['super_admin', 'support'] },
-    mfa: { type: new Schema({ type: String, secretEnc: String, enabledAt: Date }, { _id: false }) },
+    mfa: { type: new Schema({ type: String, secretEnc: String, enabledAt: Date }, { _id: false }), default: null },
+    mfaPendingSecretEnc: { type: String, default: null },
   },
   (s) => {
     s.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });

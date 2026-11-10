@@ -9,6 +9,7 @@ export interface AuthUser {
   passwordHash?: string;
   platformRole?: 'super_admin' | 'support';
   status: string;
+  mfaEnabled?: boolean;
 }
 
 export interface AuthSession {
@@ -16,6 +17,7 @@ export interface AuthSession {
   userId: Types.ObjectId;
   activeMembershipId?: Types.ObjectId | null;
   rememberMe: boolean;
+  mfaPending?: boolean;
 }
 
 export interface AuthSchool {
